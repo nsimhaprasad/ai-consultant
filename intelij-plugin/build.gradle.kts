@@ -20,6 +20,10 @@ intellij {
     plugins.set(listOf(/* Plugin Dependencies */))
 }
 
+dependencies {
+    implementation("org.json:json:20240303")
+}
+
 tasks {
     // Set the JVM compatibility versions
     withType<JavaCompile> {

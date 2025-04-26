@@ -2,22 +2,9 @@ package com.aiconsultant.intelijplugin
 
 import com.intellij.openapi.project.Project
 import com.intellij.util.io.HttpRequests
-import java.awt.BorderLayout
-import java.awt.Color
-import java.awt.Component
-import java.awt.Dimension
-import java.awt.Font
-import java.awt.GridBagConstraints
-import java.awt.GridBagLayout
-import java.awt.Insets
-import javax.swing.Box
-import javax.swing.BoxLayout
-import javax.swing.JButton
-import javax.swing.JLabel
-import javax.swing.JPanel
-import javax.swing.JScrollPane
-import javax.swing.JTextField
-import javax.swing.SwingUtilities
+import java.awt.*
+import javax.swing.*
+import org.json.JSONObject
 
 class AIConsultantToolWindowPanel(private val project: Project) : JPanel(BorderLayout()) {
     private val chatPanel = JPanel()
@@ -84,8 +71,35 @@ class AIConsultantToolWindowPanel(private val project: Project) : JPanel(BorderL
         val editor = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).selectedTextEditor
         val document = editor?.document
         val fileText = document?.text ?: "No file open."
-        appendMessage("Consulting... (API call disabled for now)", isUser = false)
-        // API call code removed for initial commit due to compilation/runtime issues
-        // TODO: Restore API call logic after initial commit
+        appendMessage("Consulting... (API call in progress)", isUser = false)
+
+        // Make API call to FastAPI backend
+        val apiUrl = "http://localhost:8000/consult"
+        val payload = JSONObject(mapOf(
+            "prompt" to userPrompt,
+            "file_content" to fileText
+        )).toString()
+
+        Thread {
+            try {
+                val response = HttpRequests
+                    .post(apiUrl, "application/json")
+                    .connectTimeout(10000)
+                    .readTimeout(20000)
+                    .tuner { connection -> /* headers */ }
+                    .connect { request ->
+                        request.write(payload)
+                        request.getReader(null).readText()
+                    }
+
+                SwingUtilities.invokeLater {
+                    appendMessage(response, isUser = false)
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    appendMessage("Error: ${e.localizedMessage}", isUser = false)
+                }
+            }
+        }.start()
     }
 }
