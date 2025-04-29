@@ -24,10 +24,10 @@ resource "google_cloud_run_service" "default" {
             cpu    = "0.25"
           }
         }
-        env {
-          name  = "PORT"
-          value = "8080"
-        }
+#         env {
+#           name  = "PORT"
+#           value = "8080"
+#         }
       }
       service_account_name = google_service_account.cloud_run.email
     }
