@@ -2,8 +2,13 @@ name: Build, Test, Verify, and Publish JetBrains Plugin
 
 on:
   push:
-    branches:
-      - main
+    paths:
+      - 'intelij-plugin/**'
+    branches: [main]
+  pull_request:
+    paths:
+      - 'intelij-plugin/**'
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
