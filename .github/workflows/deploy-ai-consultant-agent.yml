@@ -50,9 +50,9 @@ jobs:
 
       - name: Deploy AI Consultant Agent to Vertex AI
         env:
-          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          GOOGLE_CLOUD_LOCATION: ${{ secrets.GCP_LOCATION }}
-          GCP_BUCKET: ${{ secrets.GCP_BUCKET }}
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          REGION: ${{ vars.REGION }}
+          GCP_BUCKET: ${{ vars.GCP_BUCKET }}
         run: |
           cd agents/ai-consultant-agent/deployment
-          python deploy.py --create --project_id $PROJECT_ID --location $GOOGLE_CLOUD_LOCATION --bucket $GCP_BUCKET
+          python deploy.py --create --project_id $PROJECT_ID --location $REGION --bucket $GCP_BUCKET
