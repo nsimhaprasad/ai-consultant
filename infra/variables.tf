@@ -1,13 +1,18 @@
 variable "project_id" {
-  description = "GCP Project ID"
+  description = "The GCP project ID."
   type        = string
   default     = "ai-consultant-458311"
 }
 
 variable "region" {
-  description = "GCP region for resources (closest to India: asia-south1 Mumbai)"
+  description = "The GCP region."
   type        = string
   default     = "asia-south1"
+}
+
+variable "bucket_name" {
+  description = "The name of the GCS bucket for Vertex AI staging."
+  type        = string
 }
 
 variable "artifact_repo_name" {

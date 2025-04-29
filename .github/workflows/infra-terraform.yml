@@ -32,7 +32,13 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
+        working-directory: infra
+
       - name: Terraform Plan
-        run: terraform plan
+        run: terraform plan -var="project_id=${{ secrets.GCP_PROJECT_ID }}" -var="region=${{ secrets.GCP_REGION }}" -var="bucket_name=${{ secrets.GCP_BUCKET }}"
+        working-directory: infra
+
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        if: github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve -var="project_id=${{ secrets.GCP_PROJECT_ID }}" -var="region=${{ secrets.GCP_REGION }}" -var="bucket_name=${{ secrets.GCP_BUCKET }}"
+        working-directory: infra
