@@ -1,0 +1,32 @@
+name: Build, Test, Verify, and Publish JetBrains Plugin
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./intelij-plugin/gradlew
+      - name: Build with Gradle
+        run: ./intelij-plugin/gradlew buildPlugin
+      - name: Run tests
+        run: ./intelij-plugin/gradlew test
+      - name: Verify plugin
+        run: ./intelij-plugin/gradlew verifyPlugin
+      - name: Publish to JetBrains Marketplace
+        if: github.event_name == 'workflow_dispatch'
+        run: ./intelij-plugin/gradlew publishPlugin
+        env:
+          INTELLIJ_PUBLISH_TOKEN: ${{ secrets.INTELLIJ_PUBLISH_TOKEN }}
+          INTELLIJ_PUBLISH_CHANNEL: 'default'
