@@ -17,16 +17,21 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
       - name: Grant execute permission for gradlew
-        run: chmod +x ./intelij-plugin/gradlew
+        run: chmod +x ./gradlew
+        working-directory: intelij-plugin
       - name: Build with Gradle
-        run: ./intelij-plugin/gradlew buildPlugin
+        run: ./gradlew buildPlugin
+        working-directory: intelij-plugin
       - name: Run tests
-        run: ./intelij-plugin/gradlew test
+        run: ./gradlew test
+        working-directory: intelij-plugin
       - name: Verify plugin
-        run: ./intelij-plugin/gradlew verifyPlugin
+        run: ./gradlew verifyPlugin
+        working-directory: intelij-plugin
       - name: Publish to JetBrains Marketplace
         if: github.event_name == 'workflow_dispatch'
-        run: ./intelij-plugin/gradlew publishPlugin
+        run: ./gradlew publishPlugin
+        working-directory: intelij-plugin
         env:
           INTELLIJ_PUBLISH_TOKEN: ${{ secrets.INTELLIJ_PUBLISH_TOKEN }}
           INTELLIJ_PUBLISH_CHANNEL: 'default'
