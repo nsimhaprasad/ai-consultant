@@ -51,3 +51,47 @@ resource "google_cloud_run_service_iam_member" "public_invoker" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+# --- GCP AI Consultant Agent Infra ---
+
+resource "google_service_account" "vertex_agent" {
+  account_id   = "vertex-agent-sa"
+  display_name = "Vertex Agent Service Account"
+}
+
+resource "google_project_iam_member" "vertex_ai_admin" {
+  project = var.project_id
+  role    = "roles/aiplatform.admin"
+  member  = "serviceAccount:${google_service_account.vertex_agent.email}"
+}
+
+resource "google_project_iam_member" "storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${google_service_account.vertex_agent.email}"
+}
+
+resource "google_storage_bucket" "staging" {
+  name     = var.bucket_name
+  location = var.region
+}
+
+resource "google_project_service" "vertex_ai" {
+  project = var.project_id
+  service = "aiplatform.googleapis.com"
+}
+
+resource "google_project_service" "artifact_registry" {
+  project = var.project_id
+  service = "artifactregistry.googleapis.com"
+}
+
+resource "google_project_service" "iam_credentials" {
+  project = var.project_id
+  service = "iamcredentials.googleapis.com"
+}
+
+resource "google_project_service" "storage" {
+  project = var.project_id
+  service = "storage.googleapis.com"
+}

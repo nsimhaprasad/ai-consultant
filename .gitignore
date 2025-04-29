@@ -96,3 +96,15 @@ server/__pycache__/
 server/*.pyc
 intelij-plugin/build/
 intelij-plugin/out/
+
+# Terraform state and config
+.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
+*.tfvars
+.terraform.lock.hcl
+terraform.tfplan
+
+# Local .env or secrets
+.env
