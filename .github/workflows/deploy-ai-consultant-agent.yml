@@ -51,8 +51,8 @@ jobs:
       - name: Deploy AI Consultant Agent to Vertex AI
         env:
           PROJECT_ID: ${{ vars.PROJECT_ID }}
-          REGION: ${{ vars.REGION }}
+          REGION: us-central1  # Override region just for agent deployment
           GCP_BUCKET: ${{ vars.GCP_BUCKET }}
         run: |
           cd agents/ai-consultant-agent/deployment
-          python deploy.py --create --project_id $PROJECT_ID --location $REGION --bucket $GCP_BUCKET
+          python deploy.py --create --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET
