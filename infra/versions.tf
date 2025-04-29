@@ -6,6 +6,10 @@ terraform {
       version = ">= 4.0"
     }
   }
+  backend "gcs" {
+    bucket  = "ai-consultant-tfstate"   # <-- Create this bucket in GCS first!
+    prefix  = "terraform/state"
+  }
 }
 
 provider "google" {
