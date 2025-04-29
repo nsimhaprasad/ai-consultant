@@ -35,10 +35,10 @@ jobs:
         working-directory: infra
 
       - name: Terraform Plan
-        run: terraform plan -var="project_id=${{ secrets.GCP_PROJECT_ID }}" -var="region=${{ secrets.GCP_REGION }}" -var="bucket_name=${{ secrets.GCP_BUCKET }}"
+        run: terraform plan -var="project_id=${{ vars.PROJECT_ID }}" -var="region=${{ vars.REGION }}" -var="bucket_name=${{ vars.GCP_BUCKET }}"
         working-directory: infra
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve -var="project_id=${{ secrets.GCP_PROJECT_ID }}" -var="region=${{ secrets.GCP_REGION }}" -var="bucket_name=${{ secrets.GCP_BUCKET }}"
+        run: terraform apply -auto-approve -var="project_id=${{ vars.PROJECT_ID }}" -var="region=${{ vars.REGION }}" -var="bucket_name=${{ vars.GCP_BUCKET }}"
         working-directory: infra

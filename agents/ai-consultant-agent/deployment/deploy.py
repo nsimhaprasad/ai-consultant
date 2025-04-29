@@ -81,14 +81,14 @@ def main(argv: list[str]) -> None:
     load_dotenv()
 
     project_id = FLAGS.project_id or os.environ.get("PROJECT_ID")
-    location = FLAGS.location or os.environ.get("GOOGLE_CLOUD_LOCATION")
-    bucket = FLAGS.bucket or os.environ.get("GCS_BUCKET")
+    location = FLAGS.location or os.environ.get("REGION")
+    bucket = FLAGS.bucket or os.environ.get("GCP_BUCKET")
     resource_id = FLAGS.resource_id
 
     if not project_id:
         raise ValueError("GCP project ID must be provided via --project_id or PROJECT_ID env var.")
     if not location:
-        raise ValueError("GCP location must be provided via --location or GOOGLE_CLOUD_LOCATION env var.")
+        raise ValueError("GCP location must be provided via --location or REGION env var.")
 
     vertexai.init(project=project_id, location=location, staging_bucket=f"gs://{bucket}")
 
