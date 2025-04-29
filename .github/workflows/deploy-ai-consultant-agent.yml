@@ -43,6 +43,11 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
+      - name: Install ai-consultant-agent package
+        run: |
+          cd agents/ai-consultant-agent
+          pip install -e .
+
       - name: Deploy AI Consultant Agent to Vertex AI
         env:
           PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
