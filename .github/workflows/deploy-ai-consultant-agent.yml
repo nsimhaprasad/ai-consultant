@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'agents/ai-consultant-agent/**'
+  workflow_dispatch:
 
 jobs:
   deploy:
