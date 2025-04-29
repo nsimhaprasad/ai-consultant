@@ -2,8 +2,8 @@
 FROM python:3.11-slim AS builder
 WORKDIR /app
 COPY requirements.txt ./
-RUN pip install --user --upgrade pip && \
-    pip install --user -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
 
 # --- Stage 2: Production image ---
 FROM python:3.11-slim
@@ -13,8 +13,8 @@ WORKDIR /app
 RUN useradd -m appuser
 
 # Copy installed dependencies from builder
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy app code
 COPY . .
