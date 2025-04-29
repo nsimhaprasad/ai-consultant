@@ -17,7 +17,7 @@ resource "google_cloud_run_service" "default" {
   template {
     spec {
       containers {
-        image = "REPLACE_WITH_IMAGE" # To be replaced in CI/CD
+        image = "gcr.io/cloudrun/hello"
         resources {
           limits = {
             memory = "256Mi"
