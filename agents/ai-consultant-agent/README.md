@@ -131,6 +131,19 @@ Transformers-based architecture is the ideal primary solution for this project d
 Rule-based approach would be an excellent supporting solution on this project, working in conjunction with the transformer-based architecture. This combination will ensure efficient development while providing a robust and accurate NLP model.
 ```
 
+## CI/CD and Deployment
+
+- The agent can be deployed to Vertex AI using the provided GitHub Actions workflow.
+- On deployment, the agent resource ID is written to `agent_resource.txt` and uploaded as a workflow artifact.
+- This artifact is consumed by the server deployment workflow to ensure the backend always points to the latest agent.
+- Manual and automated triggers are supported (see root README for pipeline details).
+
+### Example: Manual Deployment
+
+1. Trigger the `AI Consultant Agent` workflow from the Actions UI.
+2. Optionally choose to trigger the server deployment as part of the workflow run.
+3. The workflow will deploy the agent, capture the resource ID, and upload it as an artifact for downstream use.
+
 ## Customization
 
 The Beskar AI Consultant Agent can be customized to better suit your requirements:

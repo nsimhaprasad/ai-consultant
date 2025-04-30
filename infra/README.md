@@ -18,5 +18,10 @@ This config will provision minimal, low-cost Google Cloud infra in the Mumbai re
 - Uses lowest-tier Cloud Run (1 instance, always-off by default, only pay per request)
 - No VPC, no static IP, no minimums
 
+## Integration with Deployment Pipeline
+
+- The Terraform infra provisions the GCP resources needed for both agent and server deployment, including Artifact Registry and Cloud Run.
+- The CI/CD pipeline depends on these resources for artifact storage and server hosting.
+
 ---
 Edit `variables.tf` for custom names or region.

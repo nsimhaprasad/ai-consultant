@@ -44,6 +44,19 @@ docker run -p 8080:8080 baid-server
   - `main.py` - FastAPI application entry point
   - `services/` - Service modules
 
+## CI/CD and Artifact Integration
+
+- The server deployment workflow downloads the latest agent resource artifact produced by the agent deployment workflow.
+- The agent resource ID is used to set the `AGENT_HOST` environment variable for Cloud Run.
+- The workflow supports both automatic triggers (after agent deployment) and manual runs (with agent path input).
+- After deployment, a completion artifact is uploaded for workflow tracking.
+
+### Example: Manual Server Deployment
+
+1. Trigger the `Server Deploy` workflow from the Actions UI.
+2. Provide the agent resource path as input if running manually.
+3. The workflow will download the artifact, build and deploy the server, and upload a completion signal.
+
 # Python Server Backend
 
 This is the backend server for the IntelliJ plugin. It uses FastAPI for handling HTTP requests.

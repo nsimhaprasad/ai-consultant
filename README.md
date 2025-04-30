@@ -39,6 +39,34 @@ A cross-platform developer productivity tool combining a FastAPI backend and an 
 
 ---
 
+## Deployment Pipeline Overview
+
+### Automated Agent & Server Deployment
+
+- **Agent (Vertex AI) Deployment:**
+  - Triggered by code changes in `agents/ai-consultant-agent/**` or manually via GitHub Actions UI.
+  - Deploys the agent to Vertex AI using `deploy.py`.
+  - Captures the remote agent resource ID and writes it to `agent_resource.txt`.
+  - Uploads `agent_resource.txt` as a workflow artifact for downstream jobs.
+
+- **Server (Cloud Run) Deployment:**
+  - Triggered by code changes in `server/**`, after agent deployment, or manually.
+  - Downloads the agent resource artifact and sets `AGENT_HOST` env var for the server.
+  - Builds and deploys the FastAPI server to Cloud Run.
+  - Signals completion by uploading a `server_deployment_complete` artifact.
+
+### Manual and Automated Controls
+- When running the agent workflow manually, you can choose to trigger the server deployment.
+- When running the server workflow manually, you must provide the agent resource path as input.
+
+### Artifact Handoff
+- The agent workflow uploads the agent resource as an artifact.
+- The server workflow downloads this artifact, ensuring the server always points to the latest agent.
+
+See the `agents/ai-consultant-agent/README.md` and `server/README.md` for more details on each component.
+
+---
+
 ## Setup & Development
 
 ### FastAPI Server
