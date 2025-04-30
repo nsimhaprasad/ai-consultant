@@ -24,7 +24,7 @@
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="Baid" anchor="right" factoryClass="tech.beskar.baid.intelijplugin.BaidToolWindowFactory" icon="/icons/wheel.svg" secondary="true"/>
+        <toolWindow id="Baid" anchor="right" factoryClass="tech.beskar.baid.intelijplugin.BaidToolWindowFactory" icon="/icons/beskar.svg" secondary="true"/>
         <notificationGroup id="Baid Notifications" displayType="BALLOON" />
     </extensions>
 </idea-plugin>

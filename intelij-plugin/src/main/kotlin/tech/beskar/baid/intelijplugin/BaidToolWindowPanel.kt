@@ -18,12 +18,50 @@ import com.intellij.icons.AllIcons
 import java.awt.*
 import javax.swing.*
 import org.json.JSONObject
+import java.io.InputStream
 
 class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindowPanel>(BorderLayout()) {
     private val chatPanel = JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(8)))
     private val chatScroll = JBScrollPane(chatPanel)
     private val inputField = JBTextField(30)
     private val consultButton = JButton()
+
+    // Load DM Sans font if available
+    private val dmSansRegular: Font? = try {
+        val fontStream = javaClass.getResourceAsStream("/fonts/DMSans/DMSans-Regular.ttf")
+        if (fontStream != null) {
+            val font = Font.createFont(Font.TRUETYPE_FONT, fontStream)
+            val scaledFont = font.deriveFont(JBUI.scale(14f))
+            // Register the font with the graphics environment
+            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font)
+            println("Successfully loaded DM Sans font from resources")
+            scaledFont
+        } else {
+            println("Could not find DM Sans font in resources")
+            null
+        }
+    } catch (e: Exception) {
+        println("Error loading DM Sans font: ${e.message}")
+        null
+    }
+
+    private val dmSansBold: Font? = try {
+        val fontStream = javaClass.getResourceAsStream("/fonts/DMSans/DMSans-Bold.ttf")
+        if (fontStream != null) {
+            val font = Font.createFont(Font.TRUETYPE_FONT, fontStream)
+            val scaledFont = font.deriveFont(JBUI.scale(14f))
+            // Register the font with the graphics environment
+            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font)
+            println("Successfully loaded DM Sans font from resources")
+            scaledFont
+        } else {
+            println("Could not find DM Sans font in resources")
+            null
+        }
+    } catch (e: Exception) {
+        println("Error loading DM Sans font: ${e.message}")
+        null
+    }
 
     init {
         // Set up the chat panel
@@ -60,13 +98,13 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
             // Add Junie title
             val titleLabel = JLabel("Baid").apply {
-                font = UIUtil.getLabelFont().deriveFont(Font.BOLD, JBUI.scale(36).toFloat())
+                font = dmSansBold?.deriveFont(JBUI.scale(36).toFloat()) ?: UIUtil.getLabelFont().deriveFont(Font.BOLD, JBUI.scale(36).toFloat())
                 foreground = JBColor.foreground()
             }
 
             // Add subtitle
             val subtitleLabel = JLabel("Delegate your tasks, focus on the results").apply {
-                font = UIUtil.getLabelFont().deriveFont(JBUI.scale(14).toFloat())
+                font = dmSansRegular?.deriveFont(JBUI.scale(14).toFloat()) ?: UIUtil.getLabelFont().deriveFont(JBUI.scale(14).toFloat())
                 foreground = JBColor.foreground().darker()
             }
 
@@ -83,7 +121,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         // Set up the input field
         inputField.border = JBUI.Borders.empty(JBUI.scale(12))
         inputField.emptyText.text = "Type your task here, press Enter to send prompt"
-        inputField.font = UIUtil.getLabelFont().deriveFont(JBUI.scale(13).toFloat())
+        inputField.font = dmSansRegular?.deriveFont(JBUI.scale(14).toFloat()) ?: UIUtil.getLabelFont().deriveFont(JBUI.scale(14).toFloat())
 
         // Add key listener to handle Enter key
         inputField.addKeyListener(object : java.awt.event.KeyAdapter() {
