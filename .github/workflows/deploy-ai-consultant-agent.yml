@@ -12,6 +12,10 @@ on:
         default: 'false'
         type: boolean
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
