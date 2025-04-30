@@ -1,4 +1,4 @@
-name: 'Deploy Server to Cloud Run'
+name: "Server CI"
 
 on:
   push:

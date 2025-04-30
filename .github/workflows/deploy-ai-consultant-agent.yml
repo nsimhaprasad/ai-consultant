@@ -1,4 +1,4 @@
-name: Deploy AI Consultant Agent to Vertex AI
+name: "AI Consultant Agent"
 
 on:
   push:

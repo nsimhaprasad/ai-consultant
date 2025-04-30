@@ -1,4 +1,4 @@
-name: Build, Test, Verify, and Publish JetBrains Plugin
+name: Jetbrains Plugin
 
 on:
   push:
