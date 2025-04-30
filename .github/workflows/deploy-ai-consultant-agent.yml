@@ -74,10 +74,14 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || github.event.inputs.trigger_server_deploy == 'true' }}
     steps:
-      - name: Trigger manual server deploy
-        uses: peter-evans/workflow-dispatch@v1
+      - name: Trigger server-deploy workflow
+        uses: actions/github-script@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          workflow: server-deploy.yml
-          ref: ${{ github.ref }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'server-deploy.yml',
+              ref: context.ref
+            })
