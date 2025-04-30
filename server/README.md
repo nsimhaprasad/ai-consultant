@@ -1,3 +1,49 @@
+# BAID Server
+
+A FastAPI-based server for the BAID (Beskar AI) project.
+
+## Setup
+
+### Prerequisites
+
+- Python 3.12 or higher
+- [Poetry](https://python-poetry.org/) for dependency management
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies using Poetry:
+
+```bash
+poetry install
+```
+
+### Development
+
+To run the server locally during development:
+
+```bash
+poetry run uvicorn baid_server.main:app --reload --host 0.0.0.0 --port 8080
+```
+
+### Docker
+
+Build and run using Docker:
+
+```bash
+# Build the Docker image
+docker build -t baid-server .
+
+# Run the container
+docker run -p 8080:8080 baid-server
+```
+
+## Project Structure
+
+- `baid_server/` - Main package directory
+  - `main.py` - FastAPI application entry point
+  - `services/` - Service modules
+
 # Python Server Backend
 
 This is the backend server for the IntelliJ plugin. It uses FastAPI for handling HTTP requests.
