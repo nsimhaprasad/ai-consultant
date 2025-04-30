@@ -6,9 +6,39 @@ on:
       - 'server/**'
     branches: [main]
   workflow_dispatch:
+  workflow_run:
+    workflows: ["AI Consultant Agent"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
 
 jobs:
+  # This job only runs when triggered by the AI Consultant Agent workflow
+  get-artifact-from-workflow:
+    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact from triggering workflow
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: ${{ github.event.workflow_run.workflow_id }}
+          run_id: ${{ github.event.workflow_run.id }}
+          name: agent_resource
+          path: ./agent_resources
+
+      - name: Upload artifact for this workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent_resource
+          path: ./agent_resources/agent_resource.txt
+          retention-days: 1
+
   build-and-deploy:
+    needs: get-artifact-from-workflow
+    if: ${{ github.event_name != 'workflow_run' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -34,7 +64,16 @@ jobs:
         run: |
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
+      # Skip downloading artifact if this job was triggered directly (not by workflow_run)
+      - name: Create directory for agent resource
+        if: ${{ github.event_name != 'workflow_run' }}
+        run: |
+          mkdir -p ./server/agents/ai-consultant-agent/deployment
+          echo "placeholder" > ./server/agents/ai-consultant-agent/deployment/agent_resource.txt
+
+      # Only download the artifact if this was triggered by workflow_run
       - name: Download agent resource artifact
+        if: ${{ github.event_name == 'workflow_run' }}
         uses: actions/download-artifact@v4
         with:
           name: agent_resource
@@ -58,4 +97,4 @@ jobs:
             --memory=256Mi \
             --cpu=0.25 \
             --port=8080 \
-            --set-env-vars=AGENT_HOST=$(cat ./server/agent_resource.txt)
+            --set-env-vars=AGENT_HOST=$(cat ./server/agents/ai-consultant-agent/deployment/agent_resource.txt)

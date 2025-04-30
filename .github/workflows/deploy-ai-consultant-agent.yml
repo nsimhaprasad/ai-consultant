@@ -67,11 +67,13 @@ jobs:
           cd agents/ai-consultant-agent/deployment
           python deploy.py --create --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET
 
+      # Upload the artifact with a consistent name for cross-workflow use
       - name: Upload agent resource file for server
         uses: actions/upload-artifact@v4
         with:
           name: agent_resource
           path: agents/ai-consultant-agent/deployment/agent_resource.txt
+          retention-days: 1  # Keep it for a short time since it's just for workflow handoff
 
   trigger-server-deploy:
     needs: deploy
