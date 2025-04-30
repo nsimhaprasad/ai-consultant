@@ -98,3 +98,18 @@ jobs:
             --cpu=0.25 \
             --port=8080 \
             --set-env-vars=AGENT_HOST=$(cat ./server/agents/ai-consultant-agent/deployment/agent_resource.txt)
+
+      # Create a completion signal artifact (CRITICAL ADDITION)
+      - name: Signal server deployment completion
+        if: ${{ github.event_name == 'workflow_run' }}
+        run: |
+          echo "Server deployment completed at $(date)" > server_deployment_complete.txt
+
+      # Upload the completion signal as an artifact (CRITICAL ADDITION)
+      - name: Upload completion signal
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: server_deployment_complete
+          path: server_deployment_complete.txt
+          retention-days: 1

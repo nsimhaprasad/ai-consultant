@@ -50,7 +50,8 @@ jobs:
         if: steps.check_signal.outputs.signal_found == 'true'
         run: |
           python -m pip install --upgrade pip
-          pip install -r agents/ai-consultant-agent/requirements.txt
+          cd agents/ai-consultant-agent
+          pip install -r requirements.txt
           pip install google-adk absl-py python-dotenv
 
       - name: Authenticate with Google Cloud
