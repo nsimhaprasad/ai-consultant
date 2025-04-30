@@ -1,0 +1,86 @@
+name: "Cleanup Old Agents"
+
+on:
+  workflow_run:
+    workflows: ["Server CI"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    # Only run when server deployment was successful
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Check if this was part of the AI Consultant Agent -> Server deployment chain
+      - name: Download server deployment completion signal
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: ${{ github.event.workflow_run.workflow_id }}
+          run_id: ${{ github.event.workflow_run.id }}
+          name: server_deployment_complete
+          path: ./signals
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          check_artifacts: true
+          if_no_artifact_found: warn
+
+      - name: Check if server deployment came from AI Consultant agent workflow
+        id: check_signal
+        run: |
+          if [ -f "./signals/server_deployment_complete.txt" ]; then
+            echo "signal_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "signal_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Only proceed with cleanup if the signal file was found
+      - name: Set up Python for cleanup
+        if: steps.check_signal.outputs.signal_found == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies for cleanup
+        if: steps.check_signal.outputs.signal_found == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r agents/ai-consultant-agent/requirements.txt
+          pip install google-adk absl-py python-dotenv
+
+      - name: Authenticate with Google Cloud
+        if: steps.check_signal.outputs.signal_found == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up gcloud CLI
+        if: steps.check_signal.outputs.signal_found == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Run delete_agents.py script
+        if: steps.check_signal.outputs.signal_found == 'true'
+        env:
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          REGION: us-central1
+          GCP_BUCKET: ${{ vars.GCP_BUCKET }}
+        run: |
+          cd agents/ai-consultant-agent/deployment
+          python delete_agents.py --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET
+
+      - name: Report cleanup status
+        if: steps.check_signal.outputs.signal_found == 'true'
+        run: |
+          echo "✅ Old agents cleanup completed successfully"
+
+      - name: Report no cleanup needed
+        if: steps.check_signal.outputs.signal_found == 'false'
+        run: |
+          echo "ℹ️ Skipping cleanup as this was not triggered by the AI Consultant Agent deployment chain"
