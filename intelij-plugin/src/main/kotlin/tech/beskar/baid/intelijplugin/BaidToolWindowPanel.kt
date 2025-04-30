@@ -1,24 +1,29 @@
 package tech.beskar.baid.intelijplugin
 
-import com.intellij.openapi.project.Project
-import com.intellij.util.io.HttpRequests
-import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.components.JBTextField
-import com.intellij.ui.components.JBPanel
-import com.intellij.ui.JBColor
-import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
-import com.intellij.ui.components.panels.VerticalLayout
-import com.intellij.openapi.actionSystem.ActionToolbar
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.icons.AllIcons
-import java.awt.*
-import javax.swing.*
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.project.Project
+import com.intellij.ui.JBColor
+import com.intellij.ui.components.JBPanel
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTextField
+import com.intellij.ui.components.panels.VerticalLayout
+import com.intellij.util.io.HttpRequests
+import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import org.json.JSONObject
-import java.io.InputStream
+import tech.beskar.baid.intelijplugin.util.FontUtil
+import java.awt.BorderLayout
+import java.awt.Color
+import java.awt.Font
+import java.awt.GraphicsEnvironment
+import javax.swing.JButton
+import javax.swing.JLabel
+import javax.swing.JTextPane
+import javax.swing.SwingUtilities
 
 class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindowPanel>(BorderLayout()) {
     private val chatPanel = JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(8)))
@@ -98,13 +103,13 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
             // Add Junie title
             val titleLabel = JLabel("Baid").apply {
-                font = dmSansBold?.deriveFont(JBUI.scale(36).toFloat()) ?: UIUtil.getLabelFont().deriveFont(Font.BOLD, JBUI.scale(36).toFloat())
+                font = FontUtil.getTitleFont()
                 foreground = JBColor.foreground()
             }
 
             // Add subtitle
             val subtitleLabel = JLabel("Delegate your tasks, focus on the results").apply {
-                font = dmSansRegular?.deriveFont(JBUI.scale(14).toFloat()) ?: UIUtil.getLabelFont().deriveFont(JBUI.scale(14).toFloat())
+                font = FontUtil.getSubTitleFont()
                 foreground = JBColor.foreground().darker()
             }
 
@@ -121,7 +126,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         // Set up the input field
         inputField.border = JBUI.Borders.empty(JBUI.scale(12))
         inputField.emptyText.text = "Type your task here, press Enter to send prompt"
-        inputField.font = dmSansRegular?.deriveFont(JBUI.scale(14).toFloat()) ?: UIUtil.getLabelFont().deriveFont(JBUI.scale(14).toFloat())
+        inputField.font = FontUtil.getBodyFont()
 
         // Add key listener to handle Enter key
         inputField.addKeyListener(object : java.awt.event.KeyAdapter() {
@@ -182,7 +187,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             // Create message text
             val messageText = JTextPane().apply {
                 contentType = "text/html"
-                text = "<html><body style='font-family: ${UIUtil.getLabelFont().family}; font-size: ${JBUI.scale(13)}pt;'>${message.replace("\n", "<br>")}</body></html>"
+                text = "<html><body style='font-family: ${FontUtil.getBodyFont()}; font-size: ${JBUI.scale(13)}pt;'>${message.replace("\n", "<br>")}</body></html>"
                 isEditable = false
                 background = if (isUser) JBColor(Color(240, 240, 240), Color(60, 63, 65)) else JBColor.background()
                 border = JBUI.Borders.empty()
