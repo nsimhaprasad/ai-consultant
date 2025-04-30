@@ -108,4 +108,3 @@ terraform.tfplan
 
 # Local .env or secrets
 .env
-agent_resource.txt

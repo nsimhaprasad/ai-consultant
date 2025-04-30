@@ -33,7 +33,7 @@ agent = Agent(
     name='ai_consultant_agent',
     description='Selects the most appropriate AI solution based on project requirements. For any generic queries, returns a generic LLM Response.',
     instruction='Selects the most appropriate AI solution based on project requirements. For any generic queries, returns a generic LLM Response.',
-    model="gemini-pro",  # Use Gemini model
+    model="gemini-2.0-flash",  # Use Gemini model
     tools=[select_ai_solution],
 )
 
