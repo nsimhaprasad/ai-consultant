@@ -34,6 +34,12 @@ jobs:
         run: |
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
+      - name: Download agent resource artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: agent_resource
+          path: ./server
+
       - name: Build Docker image
         run: |
           docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} ./server
@@ -51,4 +57,5 @@ jobs:
             --allow-unauthenticated \
             --memory=256Mi \
             --cpu=0.25 \
-            --port=8080
+            --port=8080 \
+            --set-env-vars=AGENT_HOST=$(cat ./server/agent_resource.txt)

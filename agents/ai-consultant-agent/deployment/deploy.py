@@ -15,6 +15,13 @@
 """Deployment script for AI Consultant Agent."""
 
 import os
+import sys
+
+# Ensure the script runs from the ai-consultant-agent root for correct packaging
+os.chdir(os.path.dirname(os.path.dirname(__file__)))
+
+# Ensure the parent directory is in sys.path for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from absl import app
 from absl import flags
@@ -54,43 +61,39 @@ def create() -> None:
             "pydantic (>=2.10.6,<3.0.0)",
             "absl-py (>=2.2.1,<3.0.0)",
         ],
-        extra_packages=["../ai_consultant_agent"],
+        extra_packages=["./ai_consultant_agent"],
     )
-    print(f"Created remote agent: {remote_agent.resource_name}")
+    resource_name = remote_agent.resource_name
+    print(f"Created remote agent: {resource_name}")
+    # Write resource_name to a file for server redeployment automation
+    with open("agent_resource.txt", "w") as f:
+        f.write(resource_name)
 
 
 def delete(resource_id: str) -> None:
-    remote_agent = agent_engines.get(resource_id)
-    remote_agent.delete(force=True)
-    print(f"Deleted remote agent: {resource_id}")
+    """Deletes an existing agent engine."""
+    agent_engines.delete(resource_id)
+    print(f"Deleted agent: {resource_id}")
 
 
 def list_agents() -> None:
-    remote_agents = agent_engines.list()
-    TEMPLATE = '''
-{agent.name} ("{agent.display_name}")
-- Create time: {agent.create_time}
-- Update time: {agent.update_time}
-'''
-    remote_agents_string = '\n'.join(TEMPLATE.format(agent=agent) for agent in remote_agents)
-    print(f"All remote agents:\n{remote_agents_string}")
+    """Lists all agent engines."""
+    agents = agent_engines.list()
+    for agent in agents:
+        print(f"Agent: {agent.resource_name}")
 
 
-def main(argv: list[str]) -> None:
-    del argv  # unused
+def main(argv: list[str]):
     load_dotenv()
+    project_id = FLAGS.project_id or os.getenv("PROJECT_ID")
+    location = FLAGS.location or os.getenv("LOCATION")
+    bucket = FLAGS.bucket or os.getenv("BUCKET")
+    resource_id = FLAGS.resource_id or os.getenv("RESOURCE_ID")
 
-    project_id = FLAGS.project_id or os.environ.get("PROJECT_ID")
-    location = FLAGS.location or os.environ.get("REGION")
-    bucket = FLAGS.bucket or os.environ.get("GCP_BUCKET")
-    resource_id = FLAGS.resource_id
+    if not project_id or not location or not bucket:
+        raise ValueError("project_id, location, and bucket are required.")
 
-    if not project_id:
-        raise ValueError("GCP project ID must be provided via --project_id or PROJECT_ID env var.")
-    if not location:
-        raise ValueError("GCP location must be provided via --location or REGION env var.")
-
-    vertexai.init(project=project_id, location=location, staging_bucket=f"gs://{bucket}")
+    vertexai.init(project=project_id, location=location, staging_bucket=bucket)
 
     if FLAGS.list:
         list_agents()
@@ -98,9 +101,8 @@ def main(argv: list[str]) -> None:
         create()
     elif FLAGS.delete:
         if not resource_id:
-            raise ValueError("Must provide --resource_id to delete an agent.")
-        agent_engines.delete(resource_id)
-        print(f"Deleted agent: {resource_id}")
+            raise ValueError("resource_id is required for deletion.")
+        delete(resource_id)
     else:
         print("No action specified. Use --list, --create, or --delete.")
 

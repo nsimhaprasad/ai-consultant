@@ -56,3 +56,22 @@ jobs:
         run: |
           cd agents/ai-consultant-agent/deployment
           python deploy.py --create --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET
+
+      - name: Upload agent resource file for server
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent_resource
+          path: agents/ai-consultant-agent/deployment/agent_resource.txt
+
+  trigger-server-deploy:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Trigger manual server deploy
+        uses: peter-evans/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          workflow: server-deploy.yml
+          ref: ${{ github.ref }}
