@@ -66,9 +66,10 @@ jobs:
   trigger-server-deploy:
     needs: deploy
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.inputs.trigger_server_deploy == 'true' }}
     steps:
       - name: Trigger manual server deploy
-        uses: peter-evans/workflow-dispatch@v1
+        uses: peter-evans/workflow-dispatch@v1.2.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
