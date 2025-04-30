@@ -5,6 +5,12 @@ on:
     paths:
       - 'agents/ai-consultant-agent/**'
   workflow_dispatch:
+    inputs:
+      trigger_server_deploy:
+        description: 'Trigger server deployment?'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
   deploy:
