@@ -6,11 +6,11 @@ import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 import javax.swing.JPanel
 
-class AIConsultantToolWindowFactory : ToolWindowFactory {
+class BaidToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val panel = AIConsultantToolWindowPanel(project)
+        val panel = BaidToolWindowPanel(project)
         val contentFactory = ContentFactory.getInstance()
-        val content = contentFactory.createContent(panel, "Baid", false)
+        val content = contentFactory.createContent(panel, "", false)
         toolWindow.contentManager.addContent(content)
     }
 }
