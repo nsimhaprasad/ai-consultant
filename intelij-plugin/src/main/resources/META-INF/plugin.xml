@@ -1,11 +1,11 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
-    <id>com.aiconsultant.aiconsultant</id>
+    <id>tech.beskar.baid</id>
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
-    <name>AI Consultant</name>
+    <name>Baid</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
     <vendor email="narasimha@beskar.tech" url="https://github.com/nsimhaprasad">Narasimha Prasad</vendor>
@@ -14,7 +14,7 @@
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
     <description><![CDATA[
-    AI Consultant brings intelligent code assistance and productivity tools to your JetBrains IDE. Get code suggestions, explanations, and more, right inside your editor.
+    Baid brings intelligent code assistance and productivity tools to your JetBrains IDE. Get code suggestions, explanations, and more, right inside your editor.
   ]]></description>
 
     <!-- Product and plugin compatibility requirements.
@@ -24,6 +24,7 @@
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="AIConsultant" anchor="right" factoryClass="com.aiconsultant.intelijplugin.AIConsultantToolWindowFactory" icon="/icons/wheel.svg" secondary="true"/>
+        <toolWindow id="Baid" anchor="right" factoryClass="tech.beskar.baid.intelijplugin.AIConsultantToolWindowFactory" icon="/icons/wheel.svg" secondary="true"/>
+        <notificationGroup id="Baid Notifications" displayType="BALLOON" />
     </extensions>
 </idea-plugin>

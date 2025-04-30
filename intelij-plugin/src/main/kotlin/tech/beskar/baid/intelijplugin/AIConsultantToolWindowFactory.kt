@@ -1,4 +1,4 @@
-package com.aiconsultant.intelijplugin
+package tech.beskar.baid.intelijplugin
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
@@ -9,8 +9,8 @@ import javax.swing.JPanel
 class AIConsultantToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val panel = AIConsultantToolWindowPanel(project)
-        val contentFactory = ContentFactory.SERVICE.getInstance()
-        val content = contentFactory.createContent(panel, "", false)
+        val contentFactory = ContentFactory.getInstance()
+        val content = contentFactory.createContent(panel, "Baid", false)
         toolWindow.contentManager.addContent(content)
     }
 }
