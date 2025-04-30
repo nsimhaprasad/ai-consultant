@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       agent_path:
-        description: 'Agent resource path (required when manually triggered)'
+        description: 'Agent resource path (optional - will use latest agent if not provided)'
         required: false
         type: string
   workflow_run:
@@ -21,25 +21,16 @@ permissions:
   actions: read
 
 jobs:
-  # Validation job to check if agent_path is provided when manually triggered
-  validate-inputs:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+  # Process manual input when workflow is triggered manually
+  process-manual-input:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.agent_path != '' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check agent path input
-        run: |
-          if [[ -z "${{ github.event.inputs.agent_path }}" ]]; then
-            echo "::error::Agent path is required when manually triggering this workflow. Please provide a valid agent_path input."
-            exit 1
-          else
-            echo "Agent path provided: ${{ github.event.inputs.agent_path }}"
-          fi
-
-      # If validation passes, create agent_resource.txt file from the input
       - name: Create agent resource file from input
         run: |
           mkdir -p ./manual_agent_resource
           echo "${{ github.event.inputs.agent_path }}" > ./manual_agent_resource/agent_resource.txt
+          echo "Using manually provided agent path: ${{ github.event.inputs.agent_path }}"
 
       # Upload as an artifact for the build-and-deploy job
       - name: Upload agent path as artifact
@@ -69,13 +60,92 @@ jobs:
           path: ./agent_resources/agent_resource.txt
           retention-days: 1
 
+  # Find latest agent when no input or artifact is available
+  find-latest-agent:
+    if: |
+      (github.event_name == 'push') || 
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.agent_path == '')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install agent dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -d "agents/ai-consultant-agent" ]; then
+            cd agents/ai-consultant-agent
+            if [ -f "requirements.txt" ]; then
+              pip install -r requirements.txt
+            fi
+          fi
+          pip install google-adk absl-py python-dotenv
+
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Find latest agent from Vertex AI
+        env:
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          REGION: us-central1
+          GCP_BUCKET: ${{ vars.GCP_BUCKET }}
+        run: |
+          mkdir -p ./latest_agent
+          
+          # Run the deploy.py with list option to get available agents
+          if [ -f "agents/ai-consultant-agent/deployment/deploy.py" ]; then
+            cd agents/ai-consultant-agent/deployment
+            python deploy.py --list --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET > agent_list.txt
+          else
+            # If the deploy.py script is not available, use gcloud directly
+            gcloud ai reasoners list --region=us-central1 --project=$PROJECT_ID > agent_list.txt
+          fi
+          
+          # Extract the first agent from the list
+          LATEST_AGENT=$(grep -o "projects/[0-9]*/locations/[^/]*/reasoningEngines/[0-9]*" agent_list.txt | head -1)
+          
+          if [ -z "$LATEST_AGENT" ]; then
+            echo "::error::No agents found in Vertex AI"
+            exit 1
+          fi
+          
+          echo "Found latest agent: $LATEST_AGENT"
+          echo "$LATEST_AGENT" > ../../latest_agent/agent_resource.txt
+          
+          # Debug output
+          cat ../../latest_agent/agent_resource.txt
+
+      - name: Upload latest agent path as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent_resource
+          path: ./latest_agent/agent_resource.txt
+          retention-days: 1
+
   build-and-deploy:
-    needs: [get-artifact-from-workflow, validate-inputs]
+    needs: [get-artifact-from-workflow, process-manual-input, find-latest-agent]
     if: |
       always() && 
-      (github.event_name == 'push' || 
-      (github.event_name == 'workflow_dispatch' && needs.validate-inputs.result == 'success') || 
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && needs.get-artifact-from-workflow.result == 'success'))
+      (
+        (github.event_name == 'push' && needs.find-latest-agent.result == 'success') || 
+        (github.event_name == 'workflow_dispatch' && 
+          ((github.event.inputs.agent_path != '' && needs.process-manual-input.result == 'success') || 
+           (github.event.inputs.agent_path == '' && needs.find-latest-agent.result == 'success'))
+        ) || 
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && needs.get-artifact-from-workflow.result == 'success')
+      )
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -106,7 +176,7 @@ jobs:
         run: |
           mkdir -p ./server/agents/ai-consultant-agent/deployment
 
-      # Download the artifact (works for both workflow_run and workflow_dispatch due to previous jobs)
+      # Download the artifact (works for all trigger types now)
       - name: Download agent resource artifact
         uses: actions/download-artifact@v4
         with:
