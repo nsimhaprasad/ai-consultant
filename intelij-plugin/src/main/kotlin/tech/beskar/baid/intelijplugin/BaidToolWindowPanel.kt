@@ -1,10 +1,6 @@
 package tech.beskar.baid.intelijplugin
 
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.Project
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBPanel
@@ -16,13 +12,10 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.util.FontUtil
-import java.awt.BorderLayout
-import java.awt.Color
-import java.awt.Font
-import java.awt.GraphicsEnvironment
+import java.awt.*
 import javax.swing.JButton
 import javax.swing.JLabel
-import javax.swing.JTextPane
+import javax.swing.JTextArea
 import javax.swing.SwingUtilities
 
 class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindowPanel>(BorderLayout()) {
@@ -77,25 +70,6 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         chatScroll.verticalScrollBar.unitIncrement = JBUI.scale(16)
         chatScroll.border = JBUI.Borders.empty()
 
-        // Create toolbar actions
-        val actionGroup = DefaultActionGroup().apply {
-            add(object : AnAction("Clear Chat", "Clear all messages", AllIcons.Actions.GC) {
-                override fun actionPerformed(e: AnActionEvent) {
-                    chatPanel.removeAll()
-                    chatPanel.revalidate()
-                    chatPanel.repaint()
-                }
-            })
-        }
-
-        // Create toolbar
-        val toolbar = ActionManager.getInstance().createActionToolbar(
-            "BaidToolbar", 
-            actionGroup, 
-            true
-        )
-        toolbar.targetComponent = this
-
         // Create title panel with Junie branding
         val titlePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
             background = JBColor.background()
@@ -120,7 +94,6 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             }
 
             add(titleContainer, BorderLayout.WEST)
-            add(toolbar.component, BorderLayout.EAST)
         }
 
         // Set up the input field
@@ -184,14 +157,18 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 verticalAlignment = JLabel.TOP
             }
 
-            // Create message text
-            val messageText = JTextPane().apply {
-                contentType = "text/html"
-                text = "<html><body style='font-family: ${FontUtil.getBodyFont()}; font-size: ${JBUI.scale(13)}pt;'>${message.replace("\n", "<br>")}</body></html>"
+            // Create message text with wrapping
+            val messageText = JTextArea().apply {
+                text = message
+                font = UIUtil.getLabelFont().deriveFont(Font.PLAIN, JBUI.scale(13f))
+                lineWrap = true
+                wrapStyleWord = true
                 isEditable = false
+                isOpaque = false
                 background = if (isUser) JBColor(Color(240, 240, 240), Color(60, 63, 65)) else JBColor.background()
                 border = JBUI.Borders.empty()
-                caretPosition = 0
+                minimumSize = Dimension(0, preferredSize.height)
+                maximumSize = Dimension(400, Int.MAX_VALUE)
             }
 
             // Add components to message panel
