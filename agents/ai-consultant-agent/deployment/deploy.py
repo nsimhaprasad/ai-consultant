@@ -16,6 +16,8 @@
 
 import os
 import sys
+import google.auth
+import requests
 
 # Ensure the script runs from the ai-consultant-agent root for correct packaging
 os.chdir(os.path.dirname(os.path.dirname(__file__)))
@@ -46,6 +48,8 @@ _AI_PLATFORM_GIT = (
     "git+https://github.com/googleapis/python-aiplatform.git@copybara_738852226"
 )
 
+flags.DEFINE_bool("force_delete", False, "Force delete agent and all child resources.")
+
 
 def create() -> None:
     """Creates an agent engine for AI Consultant Agent."""
@@ -70,9 +74,10 @@ def create() -> None:
         f.write(resource_name)
 
 
-def delete(resource_id: str) -> None:
+def delete(resource_id: str, location: str, force: bool = False) -> None:
     """Deletes an existing agent engine."""
-    agent_engines.delete(resource_id)
+    print(f"Deleting AgentEngine resource: {resource_id}")
+    agent_engines.delete(resource_id, force=force)
     print(f"Deleted agent: {resource_id}")
 
 
@@ -102,7 +107,7 @@ def main(argv: list[str]):
     elif FLAGS.delete:
         if not resource_id:
             raise ValueError("resource_id is required for deletion.")
-        delete(resource_id)
+        delete(resource_id, location, force=FLAGS.force_delete)
     else:
         print("No action specified. Use --list, --create, or --delete.")
 
