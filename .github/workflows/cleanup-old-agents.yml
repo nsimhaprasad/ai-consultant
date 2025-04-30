@@ -66,7 +66,25 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Run delete_agents.py script
+      - name: Create automatic confirmation patch for delete_agents.py
+        if: steps.check_signal.outputs.signal_found == 'true'
+        run: |
+          cd agents/ai-consultant-agent/deployment
+          # Create a temporary modified version of the script that auto-confirms
+          cp delete_agents.py delete_agents_auto.py
+          
+          # Replace the input prompt with an automatic "yes"
+          sed -i 's/confirmation = input.*/confirmation = "y"/' delete_agents_auto.py
+          
+          # Check if the modification was successful
+          if grep -q 'confirmation = "y"' delete_agents_auto.py; then
+            echo "✅ Successfully patched delete_agents.py to auto-confirm deletions"
+          else
+            echo "❌ Failed to patch delete_agents.py"
+            exit 1
+          fi
+
+      - name: Run auto-confirming delete_agents script
         if: steps.check_signal.outputs.signal_found == 'true'
         env:
           PROJECT_ID: ${{ vars.PROJECT_ID }}
@@ -74,7 +92,7 @@ jobs:
           GCP_BUCKET: ${{ vars.GCP_BUCKET }}
         run: |
           cd agents/ai-consultant-agent/deployment
-          python delete_agents.py --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET
+          python delete_agents_auto.py --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET
 
       - name: Report cleanup status
         if: steps.check_signal.outputs.signal_found == 'true'
