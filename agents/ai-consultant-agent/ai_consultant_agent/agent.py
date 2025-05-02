@@ -1,7 +1,7 @@
 import os
 import json
 from google.adk import Agent
-from typing import List
+from typing import List, Optional
 
 
 # --- Software Development Tools ---
@@ -31,7 +31,7 @@ def suggest_development_approach(project_description: str) -> str:
     """
 
 
-def refactor_code(code_snippet: str, target_principle: str = None) -> str:
+def refactor_code(code_snippet: str, target_principle: Optional[str] = None) -> str:
     """Tool function that suggests refactoring improvements for provided code."""
     return f"""
     Analyze the following code:
@@ -45,7 +45,7 @@ def refactor_code(code_snippet: str, target_principle: str = None) -> str:
     """
 
 
-def generate_tests(code_snippet: str, test_framework: str = None) -> str:
+def generate_tests(code_snippet: str, test_framework: Optional[str] = None) -> str:
     """Tool function that generates test cases for provided code."""
     return f"""
     Analyze the following code:
