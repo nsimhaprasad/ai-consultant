@@ -102,30 +102,48 @@ jobs:
           REGION: us-central1
           GCP_BUCKET: ${{ vars.GCP_BUCKET }}
         run: |
+          # Create the directory for the agent resource file
           mkdir -p ./latest_agent
           
           # Run the deploy.py with list option to get available agents
           if [ -f "agents/ai-consultant-agent/deployment/deploy.py" ]; then
             cd agents/ai-consultant-agent/deployment
             python deploy.py --list --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET > agent_list.txt
+            
+            # Extract the first agent from the list
+            LATEST_AGENT=$(grep -o "projects/[0-9]*/locations/[^/]*/reasoningEngines/[0-9]*" agent_list.txt | head -1)
+            
+            if [ -z "$LATEST_AGENT" ]; then
+              echo "::error::No agents found in Vertex AI"
+              exit 1
+            fi
+            
+            echo "Found latest agent: $LATEST_AGENT"
+            
+            # Write to the correct path relative to the current directory
+            echo "$LATEST_AGENT" > agent_resource.txt
+            
+            # Move the file to the root directory's latest_agent folder
+            cd ../../..
+            cp agents/ai-consultant-agent/deployment/agent_resource.txt ./latest_agent/
           else
             # If the deploy.py script is not available, use gcloud directly
-            gcloud ai reasoners list --region=us-central1 --project=$PROJECT_ID > agent_list.txt
+            gcloud ai reasoners list --region=us-central1 --project=$PROJECT_ID > ./latest_agent/agent_list.txt
+            
+            # Extract the first agent from the list
+            LATEST_AGENT=$(grep -o "projects/[0-9]*/locations/[^/]*/reasoningEngines/[0-9]*" ./latest_agent/agent_list.txt | head -1)
+            
+            if [ -z "$LATEST_AGENT" ]; then
+              echo "::error::No agents found in Vertex AI"
+              exit 1
+            fi
+            
+            echo "Found latest agent: $LATEST_AGENT"
+            echo "$LATEST_AGENT" > ./latest_agent/agent_resource.txt
           fi
-          
-          # Extract the first agent from the list
-          LATEST_AGENT=$(grep -o "projects/[0-9]*/locations/[^/]*/reasoningEngines/[0-9]*" agent_list.txt | head -1)
-          
-          if [ -z "$LATEST_AGENT" ]; then
-            echo "::error::No agents found in Vertex AI"
-            exit 1
-          fi
-          
-          echo "Found latest agent: $LATEST_AGENT"
-          echo "$LATEST_AGENT" > ../../latest_agent/agent_resource.txt
           
           # Debug output
-          cat ../../latest_agent/agent_resource.txt
+          cat ./latest_agent/agent_resource.txt
 
       - name: Upload latest agent path as artifact
         uses: actions/upload-artifact@v4
