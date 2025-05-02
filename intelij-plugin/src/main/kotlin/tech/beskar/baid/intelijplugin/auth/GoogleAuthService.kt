@@ -237,7 +237,7 @@ class LoginPanel(private val project: Project, private val onLoginComplete: (Goo
                     text = "Connecting..."
 
                     val authService = GoogleAuthService.getInstance()
-                    val backendUrl = "http://localhost:8080/api/auth/google-login" // Replace with your backend URL
+                    val backendUrl = "http://localhost:8080" // Replace with your backend URL
                     authService.startAuthFlow(project, backendUrl)
                         .thenAccept { userInfo ->
                             SwingUtilities.invokeLater {

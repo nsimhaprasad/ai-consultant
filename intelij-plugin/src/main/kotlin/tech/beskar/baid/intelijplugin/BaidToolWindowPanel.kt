@@ -9,18 +9,16 @@ import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
 import tech.beskar.baid.intelijplugin.auth.LoginPanel
 import tech.beskar.baid.intelijplugin.auth.UserProfilePanel
 import tech.beskar.baid.intelijplugin.util.FontUtil
-import java.awt.*
-import javax.swing.JButton
-import javax.swing.JLabel
-import javax.swing.JPanel
-import javax.swing.JTextArea
-import javax.swing.SwingUtilities
+import java.awt.BorderLayout
+import java.awt.CardLayout
+import java.awt.Color
+import java.awt.Dimension
+import javax.swing.*
 
 class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindowPanel>(BorderLayout()) {
     private val chatPanel = JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(8)))
@@ -30,7 +28,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
     // Add auth service
     private val authService = GoogleAuthService.getInstance()
-    private val backendUrl = "http://localhost:8080" // TODO: Replace with your backend URL if needed
+    private val backendUrl = "http://localhost:8080" // Use backend root, not /api/auth/google-login
 
     // Add content panel to switch between login and main UI
     private val contentPanel = JBPanel<JBPanel<*>>(CardLayout())
