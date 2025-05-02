@@ -11,10 +11,14 @@ import com.intellij.util.io.HttpRequests
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import org.json.JSONObject
+import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
+import tech.beskar.baid.intelijplugin.auth.LoginPanel
+import tech.beskar.baid.intelijplugin.auth.UserProfilePanel
 import tech.beskar.baid.intelijplugin.util.FontUtil
 import java.awt.*
 import javax.swing.JButton
 import javax.swing.JLabel
+import javax.swing.JPanel
 import javax.swing.JTextArea
 import javax.swing.SwingUtilities
 
@@ -24,44 +28,23 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     private val inputField = JBTextField(30)
     private val consultButton = JButton()
 
-    // Load DM Sans font if available
-    private val dmSansRegular: Font? = try {
-        val fontStream = javaClass.getResourceAsStream("/fonts/DMSans/DMSans-Regular.ttf")
-        if (fontStream != null) {
-            val font = Font.createFont(Font.TRUETYPE_FONT, fontStream)
-            val scaledFont = font.deriveFont(JBUI.scale(14f))
-            // Register the font with the graphics environment
-            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font)
-            println("Successfully loaded DM Sans font from resources")
-            scaledFont
-        } else {
-            println("Could not find DM Sans font in resources")
-            null
-        }
-    } catch (e: Exception) {
-        println("Error loading DM Sans font: ${e.message}")
-        null
-    }
+    // Add auth service
+    private val authService = GoogleAuthService.getInstance()
+    private val backendUrl = "http://localhost:8080" // TODO: Replace with your backend URL if needed
 
-    private val dmSansBold: Font? = try {
-        val fontStream = javaClass.getResourceAsStream("/fonts/DMSans/DMSans-Bold.ttf")
-        if (fontStream != null) {
-            val font = Font.createFont(Font.TRUETYPE_FONT, fontStream)
-            val scaledFont = font.deriveFont(JBUI.scale(14f))
-            // Register the font with the graphics environment
-            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font)
-            println("Successfully loaded DM Sans font from resources")
-            scaledFont
-        } else {
-            println("Could not find DM Sans font in resources")
-            null
-        }
-    } catch (e: Exception) {
-        println("Error loading DM Sans font: ${e.message}")
-        null
-    }
+    // Add content panel to switch between login and main UI
+    private val contentPanel = JBPanel<JBPanel<*>>(CardLayout())
+    private val loginPanel: LoginPanel
+    private val mainPanel = JBPanel<JBPanel<*>>(BorderLayout())
 
     init {
+        // Set up the login panel
+        loginPanel = LoginPanel(project) { userInfo ->
+            // User successfully logged in, switch to main panel
+            showMainPanel()
+            appendMessage("Welcome, ${userInfo.name}! How can I help you today?", isUser = false)
+        }
+
         // Set up the chat panel
         chatPanel.background = JBColor.background()
         chatPanel.border = JBUI.Borders.empty(8)
@@ -70,12 +53,12 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         chatScroll.verticalScrollBar.unitIncrement = JBUI.scale(16)
         chatScroll.border = JBUI.Borders.empty()
 
-        // Create title panel with Junie branding
-        val titlePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+        // Create header panel with Baid branding and user profile
+        val headerPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
             background = JBColor.background()
             border = JBUI.Borders.empty(JBUI.scale(16), JBUI.scale(16), JBUI.scale(8), JBUI.scale(16))
 
-            // Add Junie title
+            // Add Baid title
             val titleLabel = JLabel("Baid").apply {
                 font = FontUtil.getTitleFont()
                 foreground = JBColor.foreground()
@@ -93,7 +76,24 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 add(subtitleLabel)
             }
 
+            // User profile container - will be updated when user logs in
+            val userProfileContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                isOpaque = false
+                border = JBUI.Borders.emptyLeft(JBUI.scale(16))
+
+                // Initially show a sign-out button that will be replaced with user info
+                val userInfo = authService.getUserInfo()
+                if (userInfo != null) {
+                    val userProfilePanel = UserProfilePanel(userInfo) {
+                        // Sign out callback
+                        showLoginPanel()
+                    }
+                    add(userProfilePanel, BorderLayout.CENTER)
+                }
+            }
+
             add(titleContainer, BorderLayout.WEST)
+            add(userProfileContainer, BorderLayout.EAST)
         }
 
         // Set up the input field
@@ -136,12 +136,63 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         }
 
         // Add components to the main panel
-        add(titlePanel, BorderLayout.NORTH)
-        add(chatScroll, BorderLayout.CENTER)
-        add(inputPanel, BorderLayout.SOUTH)
+        mainPanel.add(headerPanel, BorderLayout.NORTH)
+        mainPanel.add(chatScroll, BorderLayout.CENTER)
+        mainPanel.add(inputPanel, BorderLayout.SOUTH)
 
-        // Add welcome message
-        appendMessage("Hello! I'm Baid, your AI assistant. How can I help you today?", isUser = false)
+        // Set up content panel with both login and main panels
+        contentPanel.add(loginPanel, "login")
+        contentPanel.add(mainPanel, "main")
+
+        // Add content panel to the main panel
+        add(contentPanel, BorderLayout.CENTER)
+
+        // Check if user is already authenticated
+        if (authService.isAuthenticated()) {
+            showMainPanel()
+            // Add welcome message
+            val userInfo = authService.getUserInfo()
+            if (userInfo != null) {
+                appendMessage("Welcome back, ${userInfo.name}! How can I help you today?", isUser = false)
+            } else {
+                appendMessage("Hello! I'm Baid, your AI assistant. How can I help you today?", isUser = false)
+            }
+        } else {
+            // Show login panel
+            showLoginPanel()
+        }
+    }
+
+    private fun showLoginPanel() {
+        val layout = contentPanel.layout as CardLayout
+        layout.show(contentPanel, "login")
+    }
+
+    private fun showMainPanel() {
+        val layout = contentPanel.layout as CardLayout
+        layout.show(contentPanel, "main")
+
+        // Update the header with user info
+        updateUserProfileInHeader()
+    }
+
+    private fun updateUserProfileInHeader() {
+        val headerPanel = mainPanel.getComponent(0) as JPanel
+        val userProfileContainer = headerPanel.getComponent(1) as JPanel
+
+        userProfileContainer.removeAll()
+
+        val userInfo = authService.getUserInfo()
+        if (userInfo != null) {
+            val userProfilePanel = UserProfilePanel(userInfo) {
+                // Sign out callback
+                showLoginPanel()
+            }
+            userProfileContainer.add(userProfilePanel, BorderLayout.CENTER)
+        }
+
+        userProfileContainer.revalidate()
+        userProfileContainer.repaint()
     }
 
     fun appendMessage(message: String, isUser: Boolean) {
@@ -160,7 +211,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             // Create message text with wrapping
             val messageText = JTextArea().apply {
                 text = message
-                font = UIUtil.getLabelFont().deriveFont(Font.PLAIN, JBUI.scale(13f))
+                font = FontUtil.getBodyFont()
                 lineWrap = true
                 wrapStyleWord = true
                 isEditable = false
@@ -191,7 +242,21 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     }
 
     fun consultWithAPI(userPrompt: String) {
-        // Disable input while processing
+        // Check if user is authenticated
+        if (!authService.isAuthenticated()) {
+            appendMessage("Please sign in to use Baid", isUser = false)
+            showLoginPanel()
+            return
+        }
+
+        // Get the backend token
+        val accessToken = authService.getCurrentAccessToken()
+        if (accessToken == null) {
+            appendMessage("Your session has expired. Please sign in again.", isUser = false)
+            showLoginPanel()
+            return
+        }
+
         inputField.isEnabled = false
         consultButton.isEnabled = false
         val editor = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).selectedTextEditor
@@ -200,11 +265,11 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
         // Show thinking message
         appendMessage("Thinking...", isUser = false)
-        val apiUrl = "https://ai-consultant-backend-742371152853.asia-south1.run.app/consult"
+        val apiUrl = "$backendUrl/consult"
         val payload = JSONObject(mapOf(
             "prompt" to userPrompt,
             "file_content" to fileText
-        )).toString()
+        ))
 
         // Make API request in background
         com.intellij.openapi.progress.ProgressManager.getInstance().run(
@@ -215,47 +280,40 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             ) {
                 override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
                     try {
-                        // Make API request
+                        // Make API request with auth header
                         val response = HttpRequests
                             .post(apiUrl, "application/json")
                             .connectTimeout(30000)
                             .readTimeout(30000)
-                            .tuner { connection -> 
+                            .tuner { connection ->
                                 connection.connectTimeout = 30000
                                 connection.readTimeout = 30000
+                                connection.setRequestProperty("Authorization", "Bearer $accessToken")
                             }
                             .connect { request ->
-                                request.write(payload)
+                                request.write(payload.toString())
                                 request.getReader(null).readText()
                             }
-
-                        // Parse response
-                        val jsonResponse = JSONObject(response)
-                        val aiResponse = jsonResponse.optString("received_file_content_preview", "I'm sorry, I couldn't process that request.")
-
-                        // Update UI with response
                         SwingUtilities.invokeLater {
                             // Remove thinking message
-                            chatPanel.remove(chatPanel.componentCount - 1)
-
-                            // Add AI response
-                            appendMessage(aiResponse, isUser = false)
-
-                            // Re-enable input
+                            removeLastMessageIfThinking()
+                            appendMessage(JSONObject(response).optString("response", response), isUser = false)
                             inputField.isEnabled = true
                             consultButton.isEnabled = true
                             inputField.requestFocus()
                         }
                     } catch (e: Exception) {
-                        // Handle error
                         SwingUtilities.invokeLater {
-                            // Remove thinking message
-                            chatPanel.remove(chatPanel.componentCount - 1)
-
-                            // Add error message
-                            appendMessage("Sorry, I encountered an error: ${e.message}", isUser = false)
-
-                            // Re-enable input
+                            removeLastMessageIfThinking()
+                            if (e.message?.contains("401") == true || e.message?.contains("403") == true) {
+                                // Auth error - token might be invalid
+                                appendMessage("Your session has expired. Please sign in again.", isUser = false)
+                                authService.signOut()
+                                showLoginPanel()
+                            } else {
+                                // Other error
+                                appendMessage("Sorry, I encountered an error: ${e.message}", isUser = false)
+                            }
                             inputField.isEnabled = true
                             consultButton.isEnabled = true
                             inputField.requestFocus()
@@ -264,5 +322,19 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 }
             }
         )
+    }
+
+    private fun removeLastMessageIfThinking() {
+        if (chatPanel.componentCount > 0) {
+            val lastMessage = chatPanel.getComponent(chatPanel.componentCount - 1)
+            if (lastMessage is JBPanel<*> && lastMessage.border == JBUI.Borders.empty(JBUI.scale(12), JBUI.scale(16))) {
+                val messageText = lastMessage.getComponent(1) as JTextArea
+                if (messageText.text == "Thinking...") {
+                    chatPanel.remove(lastMessage)
+                    chatPanel.revalidate()
+                    chatPanel.repaint()
+                }
+            }
+        }
     }
 }

@@ -1,13 +1,18 @@
 import os
 import dotenv
 import logging
-from fastapi import FastAPI, Request, Header, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request, Header, HTTPException, Depends
+from fastapi.responses import JSONResponse, HTMLResponse
 from vertexai.preview import reasoning_engines
 from google.adk.sessions import VertexAiSessionService
 import sqlite3
-from typing import Optional
-from datetime import datetime
+from typing import Optional, Dict
+from datetime import datetime, timedelta
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
+from jose import jwt
+import httpx
+from threading import Timer
 
 # Set up logging
 logging.basicConfig(
@@ -23,6 +28,133 @@ logger = logging.getLogger("adk_server")
 dotenv.load_dotenv()
 
 app = FastAPI()
+
+GOOGLE_CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
+GOOGLE_CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]
+JWT_SECRET = os.environ["JWT_SECRET"]
+JWT_ALGORITHM = "HS256"
+
+# Set this to the exact redirect URI registered in Google Cloud Console
+REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/auth/google-login")
+
+class GoogleCodeRequest(BaseModel):
+    code: str
+    redirect_uri: str
+
+class GoogleTokenRequest(BaseModel):
+    google_token: str
+
+# Temporary in-memory session storage for OAuth states (for demo; use Redis/db in prod)
+oauth_sessions: Dict[str, dict] = {}
+OAUTH_SESSION_TTL = 300  # 5 minutes
+
+def cleanup_state(state):
+    oauth_sessions.pop(state, None)
+
+@app.get("/api/auth/google-login")
+async def google_login_redirect(request: Request):
+    code = request.query_params.get("code")
+    state = request.query_params.get("state")
+    if not code or not state:
+        html_content = """
+        <html><body><h2>Login failed!</h2><p>Missing code or state.</p></body></html>
+        """
+        return HTMLResponse(content=html_content, status_code=400)
+    redirect_uri = REDIRECT_URI
+    try:
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code"
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            )
+        if token_resp.status_code != 200:
+            html_content = f"""
+            <html><body><h2>Login failed!</h2><p>Failed to exchange code for token: {token_resp.text}</p></body></html>
+            """
+            return HTMLResponse(content=html_content, status_code=400)
+        tokens = token_resp.json()
+        access_token = tokens["access_token"]
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+        if resp.status_code != 200:
+            html_content = f"""
+            <html><body><h2>Login failed!</h2><p>Failed to get user info: {resp.text}</p></body></html>
+            """
+            return HTMLResponse(content=html_content, status_code=400)
+        userinfo = resp.json()
+        store_user(userinfo)
+        backend_token = jwt.encode({
+            "sub": userinfo["email"],
+            "name": userinfo["name"],
+            "picture": userinfo.get("picture"),
+            "exp": (datetime.utcnow() + timedelta(hours=8)).timestamp()
+        }, JWT_SECRET, algorithm=JWT_ALGORITHM)
+        store_session_mapping(userinfo["email"], backend_token)
+        # Store in-memory session for plugin to fetch
+        oauth_sessions[state] = {
+            "access_token": backend_token,
+            "expires_in": 8 * 3600,
+            "email": userinfo["email"],
+            "name": userinfo["name"],
+            "picture": userinfo.get("picture"),
+            "error": None
+        }
+        Timer(OAUTH_SESSION_TTL, cleanup_state, args=[state]).start()
+        html_content = """
+        <html><head><title>Login Successful</title></head><body style='font-family:sans-serif;text-align:center;margin-top:10em;'><h2>Login successful!</h2><p>You may now return to your IDE to enjoy BAID agent.</p><p>You can close this window.</p></body></html>"""
+        return HTMLResponse(content=html_content, status_code=200)
+    except Exception as e:
+        html_content = f"""
+        <html><body><h2>Login failed!</h2><p>{str(e)}</p></body></html>
+        """
+        return HTMLResponse(content=html_content, status_code=500)
+
+@app.get("/api/auth/session")
+async def get_oauth_session(state: str):
+    session = oauth_sessions.get(state)
+    if not session:
+        return JSONResponse(status_code=404, content={"error": "Session not found or expired"})
+    return JSONResponse(content=session)
+
+# --- User DB logic ---
+def store_user(userinfo):
+    conn = sqlite3.connect('sessions.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE,
+            name TEXT,
+            picture TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        cursor.execute('''INSERT OR IGNORE INTO users (email, name, picture) VALUES (?, ?, ?)''',
+            (userinfo["email"], userinfo["name"], userinfo.get("picture")))
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error storing user: {str(e)}")
+    finally:
+        conn.close()
+
+# Auth dependency for /consult
+bearer_scheme = HTTPBearer()
+
+def get_current_user(token: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    try:
+        payload = jwt.decode(token.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 # Read agent_engine_id from environment variable, file, or fallback to default
 AGENT_ENGINE_ID = 'projects/742371152853/locations/us-central1/reasoningEngines/988619283045023744'
@@ -56,7 +188,6 @@ except Exception as e:
     logger.error(f"Failed to initialize VertexAiSessionService: {str(e)}")
     raise
 
-
 # Initialize the database for storing user-session mappings
 def init_db():
     logger.info("Initializing database")
@@ -84,6 +215,14 @@ def init_db():
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         ''')
+        # Create users table
+        cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE,
+            name TEXT,
+            picture TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
         conn.commit()
         conn.close()
         logger.info("Database initialization completed successfully")
@@ -91,16 +230,13 @@ def init_db():
         logger.error(f"Database initialization failed: {str(e)}")
         raise
 
-
 # Call init_db at startup
 init_db()
-
 
 @app.get("/")
 def read_root():
     logger.info("Health check endpoint called")
     return {"message": "Server is running", "agent_engine_id": AGENT_ENGINE_ID}
-
 
 # Initialize the ReasoningEngine
 def get_agent():
@@ -112,7 +248,6 @@ def get_agent():
     except Exception as e:
         logger.error(f"Failed to get ReasoningEngine instance: {str(e)}")
         raise
-
 
 # Store user-session mapping in SQLite
 def store_session_mapping(user_id, session_id):
@@ -140,7 +275,6 @@ def store_session_mapping(user_id, session_id):
     finally:
         conn.close()
 
-
 # Store message in SQLite (as backup)
 def store_message(user_id, session_id, role, content):
     logger.debug(f"Storing message: user_id={user_id}, session_id={session_id}, role={role}")
@@ -158,7 +292,6 @@ def store_message(user_id, session_id, role, content):
     finally:
         conn.close()
 
-
 # Check if a session exists in our local database
 def session_exists(user_id, session_id):
     logger.debug(f"Checking if session exists: user_id={user_id}, session_id={session_id}")
@@ -175,7 +308,6 @@ def session_exists(user_id, session_id):
     logger.debug(f"Session exists check result: {exists}")
     return exists
 
-
 # Check if a session exists in Vertex AI
 def vertex_session_exists(user_id, session_id):
     logger.debug(f"Checking if session exists in Vertex AI: user_id={user_id}, session_id={session_id}")
@@ -191,24 +323,20 @@ def vertex_session_exists(user_id, session_id):
         logger.debug(f"Session not found in Vertex AI or error: {str(e)}")
         return False
 
-
 @app.post("/consult")
-async def consult(
-        request: Request,
-        user_id: Optional[str] = Header(None),
-        session_id: Optional[str] = Header(None)
-):
+async def consult(request: Request, token: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    try:
+        payload = jwt.decode(token.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    user_id = payload["sub"]
+    # Optionally: fetch user from DB for more info
     request_id = os.urandom(4).hex()
-    logger.info(f"[{request_id}] Received /consult request: user_id={user_id}, session_id={session_id}")
+    logger.info(f"[{request_id}] Received /consult request: user_id={user_id}")
 
     data = await request.json()
     user_input = data.get("prompt", "")
     file_content = data.get("file_content", "")
-
-    # If user_id not in header, fallback to body
-    if not user_id:
-        user_id = data.get("user_id", "default_user")
-        logger.info(f"[{request_id}] No user_id in header, using from body or default: {user_id}")
 
     # Get the agent
     try:
@@ -218,34 +346,18 @@ async def consult(
         raise HTTPException(status_code=500, detail=f"Failed to initialize agent: {str(e)}")
 
     # Simplified session logic - use provided session_id directly if available
-    if not session_id:
-        # No session_id provided, so create a new one
-        logger.info(f"[{request_id}] No session_id provided, creating new session for user {user_id}")
-        try:
-            vertex_session = agent.create_session(user_id=user_id)
-            session_id = vertex_session["id"]
-            user_id = vertex_session["user_id"]
+    session_id = token.credentials
+    logger.info(f"[{request_id}] Using provided session_id: {session_id}")
 
-            logger.info(f"[{request_id}] Created new session in Vertex AI: user_id={user_id}, session_id={session_id}")
-
-            # Store the mapping in our local database
-            store_session_mapping(user_id, session_id)
-        except Exception as e:
-            logger.error(f"[{request_id}] Failed to create new session: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to create new session: {str(e)}")
+    # Store mapping if not already in DB
+    if not session_exists(user_id, session_id):
+        logger.info(
+            f"[{request_id}] Adding session mapping to local DB: user_id={user_id}, session_id={session_id}")
+        store_session_mapping(user_id, session_id)
     else:
-        # Session_id was provided - try to use it directly
-        logger.info(f"[{request_id}] Using provided session_id: {session_id}")
-
-        # Store mapping if not already in DB
-        if not session_exists(user_id, session_id):
-            logger.info(
-                f"[{request_id}] Adding session mapping to local DB: user_id={user_id}, session_id={session_id}")
-            store_session_mapping(user_id, session_id)
-        else:
-            logger.info(f"[{request_id}] Session mapping already exists in local DB")
-            # Update the last_used_at timestamp
-            store_session_mapping(user_id, session_id)
+        logger.info(f"[{request_id}] Session mapping already exists in local DB")
+        # Update the last_used_at timestamp
+        store_session_mapping(user_id, session_id)
 
     # Store user message in local DB (backup)
     store_message(user_id, session_id, "user", user_input)
@@ -320,7 +432,6 @@ async def consult(
         }
     )
 
-
 @app.get("/sessions/{user_id}")
 async def get_user_sessions(user_id: str):
     request_id = os.urandom(4).hex()
@@ -378,7 +489,6 @@ async def get_user_sessions(user_id: str):
     logger.info(f"[{request_id}] Successfully completed /sessions request for user_id={user_id}")
 
     return {"user_id": user_id, "sessions": sessions}
-
 
 @app.get("/history/{user_id}/{session_id}")
 async def get_session_history(user_id: str, session_id: str):
@@ -584,7 +694,6 @@ async def delete_session(user_id: str, session_id: str):
     except Exception as e:
         logger.error(f"[{request_id}] Error deleting session: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting session: {str(e)}")
-
 
 if __name__ == "__main__":
     import uvicorn
