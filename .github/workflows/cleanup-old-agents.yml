@@ -20,7 +20,7 @@ jobs:
 
       # Check if this was part of the AI Consultant Agent -> Server deployment chain
       - name: Download server deployment completion signal
-        uses: dawidd6/action-download-artifact@v2
+        uses: dawidd6/action-download-artifact@v6
         with:
           workflow: ${{ github.event.workflow_run.workflow_id }}
           run_id: ${{ github.event.workflow_run.id }}
