@@ -96,7 +96,8 @@ jobs:
   trigger-server-deploy:
     needs: deploy
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' || github.event.inputs.trigger_server_deploy == 'true' }}
+    # Only run this job if the workflow was manually triggered with trigger_server_deploy=true
+    if: ${{ github.event.inputs.trigger_server_deploy == 'true' }}
     steps:
       - name: Trigger server-deploy workflow
         uses: actions/github-script@v7
@@ -109,20 +110,3 @@ jobs:
               workflow_id: 'server-deploy.yml',
               ref: context.ref
             })
-
-      # Add a small delay to ensure the workflow is registered
-      - name: Wait for workflow trigger to propagate
-        run: sleep 5
-
-      # Create a signal file indicating that we're waiting for server deployment
-      - name: Signal waiting for server deployment
-        run: |
-          echo "Waiting for server deployment to complete before cleanup" > waiting_for_server.txt
-
-      # Upload this as an artifact to track state
-      - name: Upload waiting status
-        uses: actions/upload-artifact@v4
-        with:
-          name: waiting_for_server
-          path: waiting_for_server.txt
-          retention-days: 1
