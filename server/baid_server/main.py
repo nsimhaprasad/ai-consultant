@@ -38,8 +38,13 @@ logger.info(f"Using Agent Engine ID: {AGENT_ENGINE_ID}")
 PROJECT_ID = os.getenv("PROJECT_ID", "742371152853")
 LOCATION = os.getenv("LOCATION", "us-central1")
 
+# Extract just the ID part from the full resource name
+AGENT_ENGINE_ID_ONLY = AGENT_ENGINE_ID.split('/')[-1]
+logger.info(f"Extracted Agent Engine ID: {AGENT_ENGINE_ID_ONLY}")
+
 # The app_name used with the session service should be the Reasoning Engine ID or name
-REASONING_ENGINE_APP_NAME = f"projects/{PROJECT_ID}/locations/{LOCATION}/reasoningEngines/{AGENT_ENGINE_ID}"
+# Using just the numeric ID as indicated by _parse_reasoning_engine_id method in VertexAiSessionService
+REASONING_ENGINE_APP_NAME = AGENT_ENGINE_ID_ONLY
 
 logger.info(f"Using Reasoning Engine App Name: {REASONING_ENGINE_APP_NAME}")
 
@@ -66,6 +71,17 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, session_id)
+        )
+        ''')
+        # Create messages table for storing chat history as backup
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            session_id TEXT,
+            role TEXT,
+            content TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         ''')
         conn.commit()
@@ -121,6 +137,24 @@ def store_session_mapping(user_id, session_id):
     except Exception as e:
         logger.error(f"Error storing session mapping: {str(e)}")
         raise
+    finally:
+        conn.close()
+
+
+# Store message in SQLite (as backup)
+def store_message(user_id, session_id, role, content):
+    logger.debug(f"Storing message: user_id={user_id}, session_id={session_id}, role={role}")
+    conn = sqlite3.connect('sessions.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO messages (user_id, session_id, role, content) VALUES (?, ?, ?, ?)",
+            (user_id, session_id, role, content)
+        )
+        conn.commit()
+        logger.debug(f"Message stored successfully")
+    except Exception as e:
+        logger.error(f"Error storing message: {str(e)}")
     finally:
         conn.close()
 
@@ -213,6 +247,9 @@ async def consult(
             # Update the last_used_at timestamp
             store_session_mapping(user_id, session_id)
 
+    # Store user message in local DB (backup)
+    store_message(user_id, session_id, "user", user_input)
+
     # Query the agent using the provided or new session_id
     logger.info(
         f"[{request_id}] Querying agent with: user_id={user_id}, session_id={session_id}, prompt={user_input[:50]}...")
@@ -230,6 +267,9 @@ async def consult(
 
         logger.info(f"[{request_id}] Got response from agent of length {len(response_text)} characters")
         logger.debug(f"[{request_id}] Response preview: {response_text[:100]}...")
+
+        # Store agent response in local DB (backup)
+        store_message(user_id, session_id, "agent", response_text)
     except Exception as e:
         logger.error(f"[{request_id}] Error querying agent with provided session: {str(e)}")
 
@@ -247,6 +287,9 @@ async def consult(
             # Store the mapping in our local database
             store_session_mapping(user_id, session_id)
 
+            # Store user message in new session
+            store_message(user_id, session_id, "user", user_input)
+
             # Try again with the new session
             response_text = ""
             for event in agent.stream_query(
@@ -257,6 +300,9 @@ async def consult(
                 for part in event.get("content", {}).get("parts", []):
                     if "text" in part:
                         response_text += part["text"]
+
+            # Store agent response in local DB for new session
+            store_message(user_id, session_id, "agent", response_text)
 
             logger.info(f"[{request_id}] Got response with new session of length {len(response_text)} characters")
         except Exception as e2:
@@ -310,9 +356,9 @@ async def get_user_sessions(user_id: str):
                 user_id=user_id
             )
 
-            logger.info(f"[{request_id}] Found {len(adk_sessions)} sessions in ADK for user_id={user_id}")
+            logger.info(f"[{request_id}] Found {len(adk_sessions.sessions)} sessions in ADK for user_id={user_id}")
 
-            for session in adk_sessions:
+            for session in adk_sessions.sessions:
                 # Store in our local DB for future reference
                 store_session_mapping(user_id, session.id)
 
@@ -342,93 +388,138 @@ async def get_session_history(user_id: str, session_id: str):
     # First check if the session exists in our local DB
     if not session_exists(user_id, session_id):
         logger.warning(f"[{request_id}] Session {session_id} not found for user {user_id} in local DB")
-        # This is fine - just log it but continue
+        # Store it if it exists in Vertex AI but not in local DB
+        try:
+            if vertex_session_exists(user_id, session_id):
+                logger.info(f"[{request_id}] Session found in Vertex AI but not in local DB. Adding to local DB.")
+                store_session_mapping(user_id, session_id)
+            else:
+                logger.error(f"[{request_id}] Session not found in both DB and Vertex AI")
+                raise HTTPException(status_code=404, detail=f"Session {session_id} not found for user {user_id}")
+        except Exception as e:
+            logger.error(f"[{request_id}] Error checking Vertex AI session: {str(e)}")
+            # Continue anyway, we'll try other methods
 
     try:
-        # The error suggests there's an issue with the app_name format
-        # Let's try using just the AGENT_ENGINE_ID directly without adding project/location prefixes
-        logger.info(f"[{request_id}] Retrieving session history: user_id={user_id}, session_id={session_id}")
+        # First try to get history from ADK's session service
+        logger.info(f"[{request_id}] Trying to get history from ADK session service")
+        session = session_service.get_session(
+            app_name=REASONING_ENGINE_APP_NAME,
+            user_id=user_id,
+            session_id=session_id
+        )
 
-        # Direct approach using the ReasoningEngine API
-        agent = get_agent()
+        # Check if we have events in the session
+        if hasattr(session, 'events') and session.events:
+            logger.info(f"[{request_id}] Found {len(session.events)} events in ADK session")
 
-        # Get the messages directly from the agent using the stream_history method or similar
-        history = []
-        try:
-            # Query the history using the Vertex AI Reasoning Engine client directly
-            # This bypasses the ADK session service which seems to have formatting issues
+            # Extract the events (chat history)
+            history = []
 
-            # Note: We don't use session_service.get_session here because of the app_name issue
-            # Instead, we'll use a direct approach to get the conversation history
+            for event in session.events:
+                try:
+                    # Process each event to extract message content
+                    message_text = ""
+                    if (hasattr(event, 'content') and
+                            hasattr(event.content, 'parts') and
+                            event.content.parts):
 
-            # Using ReasoningEngine API directly (if available)
-            # Check if the agent has a method like get_history or list_messages
-            if hasattr(agent, 'get_history'):
-                messages = agent.get_history(user_id=user_id, session_id=session_id)
-                for msg in messages:
-                    if msg.get('role') == 'user':
+                        # Collect text from all parts
+                        for part in event.content.parts:
+                            if hasattr(part, 'text') and part.text:
+                                message_text += part.text
+
+                    # If we found text content and have author info
+                    if message_text and hasattr(event, 'author'):
+                        # Determine role based on author field
+                        role = "user" if event.author == "user" else "agent"
+
+                        # Add to history
                         history.append({
-                            "role": "user",
-                            "message": msg.get('content', ''),
-                            "timestamp": msg.get('timestamp', None)
+                            "role": role,
+                            "message": message_text,
+                            "timestamp": event.timestamp if hasattr(event, 'timestamp') else None
                         })
-                    else:
-                        history.append({
-                            "role": "agent",
-                            "message": msg.get('content', ''),
-                            "timestamp": msg.get('timestamp', None)
-                        })
+                        logger.debug(f"[{request_id}] Added {role} message: {message_text[:50]}...")
+                except Exception as e:
+                    logger.warning(f"[{request_id}] Error processing event: {str(e)}")
+
+            # Sort by timestamp
+            history.sort(key=lambda x: x["timestamp"] if x["timestamp"] is not None else 0)
+
+            logger.info(f"[{request_id}] Successfully formatted {len(history)} messages from ADK session")
+
+            if history:
+                return {
+                    "user_id": user_id,
+                    "session_id": session_id,
+                    "history": history,
+                    "source": "vertex_ai_session_service"
+                }
             else:
-                # If there's no direct method, we'll need to use a workaround
-                # One approach is to store history in our local database during each consult call
-                # Since we haven't implemented that yet, let's extract this information
-                # from our local database for now
+                logger.warning(f"[{request_id}] No messages extracted from events, falling back to local DB")
+        else:
+            logger.warning(f"[{request_id}] No events found in ADK session, falling back to local DB")
+    except Exception as e:
+        logger.warning(f"[{request_id}] Error getting history from ADK session service: {str(e)}")
+        # Continue to try local DB
 
-                conn = sqlite3.connect('sessions.db')
-                cursor = conn.cursor()
+    # Fall back to local database if ADK session service fails
+    logger.info(f"[{request_id}] Trying to get history from local database")
+    try:
+        conn = sqlite3.connect('sessions.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT role, content, timestamp FROM messages WHERE user_id = ? AND session_id = ? ORDER BY timestamp ASC",
+            (user_id, session_id)
+        )
 
-                # Add a query to get messages if you have them stored locally
-                # For now, return a placeholder message
-                history.append({
-                    "role": "system",
-                    "message": "History retrieval is currently limited. We're tracking session existence but not message content in the local database.",
-                    "timestamp": datetime.now().timestamp()
-                })
-
-                conn.close()
-
-                logger.warning(
-                    f"[{request_id}] Limited history retrieval capability. Consider implementing local message storage.")
-        except Exception as e:
-            logger.error(f"[{request_id}] Error retrieving conversation history: {str(e)}")
-            # Fall back to a simpler approach - inform user that detailed history isn't available
+        history = []
+        for row in cursor.fetchall():
             history.append({
-                "role": "system",
-                "message": "We're unable to retrieve the detailed conversation history at this time.",
-                "timestamp": datetime.now().timestamp()
+                "role": row[0],
+                "message": row[1],
+                "timestamp": row[2]
             })
 
-        logger.info(f"[{request_id}] Retrieved {len(history)} messages for session {session_id}")
+        conn.close()
 
-        return {
-            "user_id": user_id,
-            "session_id": session_id,
-            "history": history,
-            "note": "Session exists, but detailed history retrieval may be limited."
-        }
-
+        if history:
+            logger.info(f"[{request_id}] Found {len(history)} messages in local DB")
+            return {
+                "user_id": user_id,
+                "session_id": session_id,
+                "history": history,
+                "source": "local_database"
+            }
+        else:
+            logger.warning(f"[{request_id}] No messages found in local DB")
+            # Return a placeholder message
+            return {
+                "user_id": user_id,
+                "session_id": session_id,
+                "history": [{
+                    "role": "system",
+                    "message": "Session exists, but no message history was found. You can continue the conversation.",
+                    "timestamp": datetime.now().timestamp()
+                }],
+                "note": "Session exists, but no message history was found."
+            }
     except Exception as e:
-        logger.error(f"[{request_id}] Error in history endpoint: {str(e)}")
+        logger.error(f"[{request_id}] Error getting history from local DB: {str(e)}")
 
-        # Return a more informative error response
+        # All retrieval methods failed, return an informative error
         return JSONResponse(
-            status_code=500,
             content={
                 "user_id": user_id,
                 "session_id": session_id,
+                "history": [{
+                    "role": "system",
+                    "message": "We encountered an error retrieving the conversation history. You can continue using this session.",
+                    "timestamp": datetime.now().timestamp()
+                }],
                 "error": str(e),
-                "note": "There was an error retrieving the full history. The Vertex AI API may have changed or the session format is different than expected.",
-                "workaround": "You can continue using this session for conversations, even though we can't retrieve its history."
+                "note": "Error retrieving history, but the session is still valid for continued conversation."
             }
         )
 
@@ -467,15 +558,26 @@ async def delete_session(user_id: str, session_id: str):
         # Delete from our local DB
         conn = sqlite3.connect('sessions.db')
         cursor = conn.cursor()
+
+        # Delete session mapping
         cursor.execute(
             "DELETE FROM user_sessions WHERE user_id = ? AND session_id = ?",
             (user_id, session_id)
         )
         deleted_count = cursor.rowcount
+
+        # Delete associated messages
+        cursor.execute(
+            "DELETE FROM messages WHERE user_id = ? AND session_id = ?",
+            (user_id, session_id)
+        )
+        deleted_messages = cursor.rowcount
+
         conn.commit()
         conn.close()
 
-        logger.info(f"[{request_id}] Deleted {deleted_count} row(s) from local DB")
+        logger.info(
+            f"[{request_id}] Deleted {deleted_count} session(s) and {deleted_messages} message(s) from local DB")
 
         return {"message": f"Session {session_id} for user {user_id} deleted successfully"}
 
@@ -489,4 +591,4 @@ if __name__ == "__main__":
 
     port = int(os.getenv("PORT", 8080))
     logger.info(f"Starting server on port {port}")
-    uvicorn.run("baid_server.main:app", host="0.0.0.0", port=port)
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
