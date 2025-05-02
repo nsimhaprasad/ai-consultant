@@ -2,14 +2,25 @@
 FROM python:3.12-slim AS builder
 WORKDIR /app
 
+# Install build dependencies for Tree-sitter
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    pkg-config \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy project files first
 COPY pyproject.toml poetry.lock ./
 RUN mkdir baid_server
 RUN touch baid_server/__init__.py
 
-# Install dependencies
+# Install dependencies using environment variable instead of config command
 RUN pip install --upgrade pip && pip install poetry
-RUN poetry config virtualenvs.create false && poetry install --no-interaction --no-ansi
+ENV POETRY_VIRTUALENVS_CREATE=false
+RUN poetry install --no-interaction --no-ansi
 
 # --- Stage 2: Production image ---
 FROM python:3.12-slim
@@ -17,6 +28,11 @@ WORKDIR /app
 
 # Create a non-root user for security
 RUN useradd -m appuser
+
+# Install runtime dependencies for Tree-sitter
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy installed dependencies from builder
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
