@@ -29,7 +29,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
     // Add content panel to switch between login and main UI
     private val contentPanel = JBPanel<JBPanel<*>>(CardLayout())
-    private val loginPanel: LoginPanel
+    private var loginPanel: LoginPanel
     private val mainPanel = JBPanel<JBPanel<*>>(BorderLayout())
 
     // User profile button reference
@@ -47,6 +47,11 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             updateUserProfileButton()
             appendMessage("Welcome, ${userInfo.name}! How can I help you today?", isUser = false)
         }
+
+        contentPanel.add(loginPanel, "login")
+        contentPanel.add(mainPanel, "main")
+        add(contentPanel, BorderLayout.CENTER)
+        checkAuthenticationStatus()
 
         // Set up the chat panel
         chatPanel.background = JBColor.background()
@@ -68,7 +73,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             }
 
             // Add subtitle
-            val subtitleLabel = JLabel("Delegate your tasks, focus on the results").apply {
+            val subtitleLabel = JLabel("Transform ideas into outcomes, instantly").apply {
                 font = FontUtil.getSubTitleFont()
                 foreground = JBColor.foreground().darker()
             }
@@ -365,24 +370,26 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
     private fun showLoginPanel() {
         val layout = contentPanel.layout as CardLayout
-        layout.show(contentPanel, "login")
-        // --- Reset session when logging out ---
-        currentSessionId = null
-        // Rather than calling resetState(), let's recreate the login panel
-        // since LoginPanel doesn't have a resetState() method
-        val index = contentPanel.getComponentZOrder(loginPanel)
+
+        // Remove the old login panel
         contentPanel.remove(loginPanel)
 
         // Create a new login panel
-        val newLoginPanel = LoginPanel(project) { userInfo ->
+        loginPanel = LoginPanel(project) { userInfo ->
             // User successfully logged in, switch to main panel
             showMainPanel()
             updateUserProfileButton()
             appendMessage("Welcome, ${userInfo.name}! How can I help you today?", isUser = false)
         }
 
-        // Add it back at the same index
-        contentPanel.add(newLoginPanel, "login", index)
+        // Add it back
+        contentPanel.add(loginPanel, "login", 0)
+
+        // --- Reset session when logging out ---
+        currentSessionId = null
+
+        // Show the login panel
+        layout.show(contentPanel, "login")
     }
 
     private fun showMainPanel() {
