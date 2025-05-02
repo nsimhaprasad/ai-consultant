@@ -244,7 +244,7 @@ jobs:
             --memory=256Mi \
             --cpu=0.25 \
             --port=8080 \
-            --set-env-vars=AGENT_HOST=$AGENT_PATH
+            --set-env-vars=AGENT_ENGINE_ID=$AGENT_PATH
 
       # Create a completion signal artifact
       - name: Signal server deployment completion
