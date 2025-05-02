@@ -13,7 +13,7 @@ dotenv.load_dotenv()
 app = FastAPI()
 
 # Read agent_engine_id from environment variable, file, or fallback to default
-AGENT_ENGINE_ID = 'projects/742371152853/locations/us-central1/reasoningEngines/988619283045023744'
+AGENT_ENGINE_ID = os.getenv("AGENT_ENGINE_ID")
 if not AGENT_ENGINE_ID and os.path.exists("../agent_resource.txt"):
     with open("../agent_resource.txt") as f:
         AGENT_ENGINE_ID = f.read().strip()
