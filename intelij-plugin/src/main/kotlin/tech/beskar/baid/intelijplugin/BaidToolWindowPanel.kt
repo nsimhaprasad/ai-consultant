@@ -1,6 +1,7 @@
 package tech.beskar.baid.intelijplugin
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBPanel
@@ -78,16 +79,6 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             val userProfileContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
                 isOpaque = false
                 border = JBUI.Borders.emptyLeft(JBUI.scale(16))
-
-                // Initially show a sign-out button that will be replaced with user info
-                val userInfo = authService.getUserInfo()
-                if (userInfo != null) {
-                    val userProfilePanel = UserProfilePanel(userInfo) {
-                        // Sign out callback
-                        showLoginPanel()
-                    }
-                    add(userProfilePanel, BorderLayout.CENTER)
-                }
             }
 
             add(titleContainer, BorderLayout.WEST)
@@ -145,19 +136,37 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         // Add content panel to the main panel
         add(contentPanel, BorderLayout.CENTER)
 
-        // Check if user is already authenticated
-        if (authService.isAuthenticated()) {
-            showMainPanel()
-            // Add welcome message
-            val userInfo = authService.getUserInfo()
-            if (userInfo != null) {
-                appendMessage("Welcome back, ${userInfo.name}! How can I help you today?", isUser = false)
-            } else {
-                appendMessage("Hello! I'm Baid, your AI assistant. How can I help you today?", isUser = false)
+        // Check if user is already authenticated in background
+        checkAuthenticationStatus()
+    }
+
+    // Move authentication check to background
+    private fun checkAuthenticationStatus() {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val isAuthenticated = authService.isAuthenticated()
+                val userInfo = if (isAuthenticated) authService.getUserInfo() else null
+
+                SwingUtilities.invokeLater {
+                    if (isAuthenticated) {
+                        showMainPanel()
+                        // Add welcome message
+                        if (userInfo != null) {
+                            appendMessage("Welcome back, ${userInfo.name}! How can I help you today?", isUser = false)
+                        } else {
+                            appendMessage("Hello! I'm Baid, your AI assistant. How can I help you today?", isUser = false)
+                        }
+                    } else {
+                        // Show login panel
+                        showLoginPanel()
+                    }
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    // Show login panel on error
+                    showLoginPanel()
+                }
             }
-        } else {
-            // Show login panel
-            showLoginPanel()
         }
     }
 
@@ -175,22 +184,30 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     }
 
     private fun updateUserProfileInHeader() {
-        val headerPanel = mainPanel.getComponent(0) as JPanel
-        val userProfileContainer = headerPanel.getComponent(1) as JPanel
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val userInfo = authService.getUserInfo()
+                SwingUtilities.invokeLater {
+                    val headerPanel = mainPanel.getComponent(0) as JPanel
+                    val userProfileContainer = headerPanel.getComponent(1) as JPanel
 
-        userProfileContainer.removeAll()
+                    userProfileContainer.removeAll()
 
-        val userInfo = authService.getUserInfo()
-        if (userInfo != null) {
-            val userProfilePanel = UserProfilePanel(userInfo) {
-                // Sign out callback
-                showLoginPanel()
+                    if (userInfo != null) {
+                        val userProfilePanel = UserProfilePanel(userInfo) {
+                            // Sign out callback
+                            showLoginPanel()
+                        }
+                        userProfileContainer.add(userProfilePanel, BorderLayout.CENTER)
+                    }
+
+                    userProfileContainer.revalidate()
+                    userProfileContainer.repaint()
+                }
+            } catch (e: Exception) {
+                // Handle error if needed
             }
-            userProfileContainer.add(userProfilePanel, BorderLayout.CENTER)
         }
-
-        userProfileContainer.revalidate()
-        userProfileContainer.repaint()
     }
 
     fun appendMessage(message: String, isUser: Boolean) {
@@ -241,20 +258,48 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
     fun consultWithAPI(userPrompt: String) {
         // Check if user is authenticated
-        if (!authService.isAuthenticated()) {
-            appendMessage("Please sign in to use Baid", isUser = false)
-            showLoginPanel()
-            return
-        }
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val isAuthenticated = authService.isAuthenticated()
+                SwingUtilities.invokeLater {
+                    if (!isAuthenticated) {
+                        appendMessage("Please sign in to use Baid", isUser = false)
+                        showLoginPanel()
+                        return@invokeLater
+                    }
 
-        // Get the backend token
-        val accessToken = authService.getCurrentAccessToken()
-        if (accessToken == null) {
-            appendMessage("Your session has expired. Please sign in again.", isUser = false)
-            showLoginPanel()
-            return
-        }
+                    // Get the backend token
+                    ApplicationManager.getApplication().executeOnPooledThread {
+                        try {
+                            val accessToken = authService.getCurrentAccessToken()
+                            SwingUtilities.invokeLater {
+                                if (accessToken == null) {
+                                    appendMessage("Your session has expired. Please sign in again.", isUser = false)
+                                    showLoginPanel()
+                                    return@invokeLater
+                                }
 
+                                // Continue with API request
+                                performAPIRequest(userPrompt, accessToken)
+                            }
+                        } catch (e: Exception) {
+                            SwingUtilities.invokeLater {
+                                appendMessage("Authentication check failed. Please sign in again.", isUser = false)
+                                showLoginPanel()
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    appendMessage("Authentication check failed. Please sign in again.", isUser = false)
+                    showLoginPanel()
+                }
+            }
+        }
+    }
+
+    private fun performAPIRequest(userPrompt: String, accessToken: String) {
         inputField.isEnabled = false
         consultButton.isEnabled = false
         val editor = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).selectedTextEditor
