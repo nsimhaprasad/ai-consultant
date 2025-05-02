@@ -201,11 +201,13 @@ jobs:
           name: agent_resource
           path: ./server/agents/ai-consultant-agent/deployment
 
-      # Log the agent resource content for debugging
+      # Log the agent resource content for debugging with improved visibility
       - name: Log agent resource
         run: |
-          echo "Using agent resource:"
+          echo "=================================================="
+          echo "DEPLOYING WITH AGENT RESOURCE:"
           cat ./server/agents/ai-consultant-agent/deployment/agent_resource.txt
+          echo "=================================================="
 
       - name: Build Docker image
         run: |
@@ -215,8 +217,25 @@ jobs:
         run: |
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
 
+      - name: Display agent information before deployment
+        run: |
+          echo "=============================================="
+          echo "DEPLOYING SERVER WITH AGENT:"
+          AGENT_PATH=$(cat ./server/agents/ai-consultant-agent/deployment/agent_resource.txt)
+          echo $AGENT_PATH
+          
+          # Try to get more detailed information about the agent if possible
+          if [ -n "$AGENT_PATH" ]; then
+            echo "Attempting to fetch detailed agent info..."
+            gcloud ai reasoners describe $AGENT_PATH --format="yaml" || echo "Unable to fetch detailed agent info"
+          fi
+          echo "=============================================="
+
       - name: Deploy to Cloud Run
         run: |
+          AGENT_PATH=$(cat ./server/agents/ai-consultant-agent/deployment/agent_resource.txt)
+          echo "Deploying with AGENT_HOST=$AGENT_PATH"
+          
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             --region=${{ env.REGION }} \
@@ -225,7 +244,7 @@ jobs:
             --memory=256Mi \
             --cpu=0.25 \
             --port=8080 \
-            --set-env-vars=AGENT_HOST=$(cat ./server/agents/ai-consultant-agent/deployment/agent_resource.txt)
+            --set-env-vars=AGENT_HOST=$AGENT_PATH
 
       # Create a completion signal artifact
       - name: Signal server deployment completion
