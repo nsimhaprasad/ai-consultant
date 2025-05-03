@@ -150,7 +150,7 @@ async def get_oauth_session(state: str):
 def init_db():
     logger.info("Initializing database")
     try:
-        conn = sqlite3.connect('sessions.db')
+        conn = sqlite3.connect('/tmp/sessions.db')
         cursor = conn.cursor()
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -187,7 +187,7 @@ def init_db():
 
 
 def store_user(userinfo):
-    conn = sqlite3.connect('sessions.db')
+    conn = sqlite3.connect('/tmp/sessions.db')
     cursor = conn.cursor()
     try:
         cursor.execute('''INSERT OR IGNORE INTO users (email, name, picture) VALUES (?, ?, ?)''',
@@ -201,7 +201,7 @@ def store_user(userinfo):
 
 def store_session_mapping(user_id, session_id):
     logger.info(f"Storing/updating session mapping: user_id={user_id}, session_id={session_id}")
-    conn = sqlite3.connect('sessions.db')
+    conn = sqlite3.connect('/tmp/sessions.db')
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -224,7 +224,7 @@ def store_session_mapping(user_id, session_id):
 
 def store_message(user_id, session_id, role, content):
     logger.debug(f"Storing message: user_id={user_id}, session_id={session_id}, role={role}")
-    conn = sqlite3.connect('sessions.db')
+    conn = sqlite3.connect('/tmp/sessions.db')
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -239,7 +239,7 @@ def store_message(user_id, session_id, role, content):
 
 
 def session_exists(user_id, session_id):
-    conn = sqlite3.connect('sessions.db')
+    conn = sqlite3.connect('/tmp/sessions.db')
     cursor = conn.cursor()
     cursor.execute(
         "SELECT id FROM user_sessions WHERE user_id = ? AND session_id = ?",
@@ -466,7 +466,7 @@ async def consult(
 
 @app.get("/sessions/{user_id}")
 async def get_user_sessions(user_id: str):
-    conn = sqlite3.connect('sessions.db')
+    conn = sqlite3.connect('/tmp/sessions.db')
     cursor = conn.cursor()
     cursor.execute(
         "SELECT session_id, created_at, last_used_at FROM user_sessions WHERE user_id = ? ORDER BY last_used_at DESC",
@@ -492,7 +492,7 @@ async def get_user_sessions(user_id: str):
 
 @app.get("/history/{user_id}/{session_id}")
 async def get_session_history(user_id: str, session_id: str):
-    conn = sqlite3.connect('sessions.db')
+    conn = sqlite3.connect('/tmp/sessions.db')
     cursor = conn.cursor()
     cursor.execute(
         "SELECT role, content, timestamp FROM messages WHERE user_id = ? AND session_id = ? ORDER BY timestamp ASC",
@@ -530,7 +530,7 @@ async def delete_session(user_id: str, session_id: str):
         )
 
         # Delete from local DB
-        conn = sqlite3.connect('sessions.db')
+        conn = sqlite3.connect('/tmp/sessions.db')
         cursor = conn.cursor()
 
         cursor.execute(
