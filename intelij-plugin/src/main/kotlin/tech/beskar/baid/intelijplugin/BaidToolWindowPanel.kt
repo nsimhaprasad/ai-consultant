@@ -487,92 +487,186 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         }
     }
 
-    private fun performAPIRequest(userPrompt: String, accessToken: String, sessionId: String?) {
-        inputField.isEnabled = false
-        consultButton.isEnabled = false
-        val editor = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).selectedTextEditor
-        val document = editor?.document
-        val fileText = document?.text ?: "No file open."
+   private fun performAPIRequest(userPrompt: String, accessToken: String, sessionId: String?) {
+    println("Starting API request with sessionId: $sessionId")
 
-        // Show thinking message
-        appendMessage("Thinking...", isUser = false)
-        val apiUrl = "$backendUrl/consult"
-        val payload = JSONObject(
-            mapOf(
-                "prompt" to userPrompt,
-                "file_content" to fileText
-            )
+    inputField.isEnabled = false
+    consultButton.isEnabled = false
+    val editor = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).selectedTextEditor
+    val document = editor?.document
+    val fileText = document?.text ?: "No file open."
+
+    // Show thinking message
+    appendMessage("Thinking...", isUser = false)
+    val apiUrl = "$backendUrl/consult"
+
+    val payload = JSONObject(
+        mapOf(
+            "prompt" to userPrompt,
+            "file_content" to fileText
         )
+    )
 
-        // Make API request in background
-        com.intellij.openapi.progress.ProgressManager.getInstance().run(
-            object : com.intellij.openapi.progress.Task.Backgroundable(
-                project,
-                "Consulting AI",
-                false
-            ) {
-                override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
-                    try {
-                        // Make API request with auth header and session_id header
-                        val response = HttpRequests
-                            .post(apiUrl, "application/json")
-                            .connectTimeout(30000)
-                            .readTimeout(30000)
-                            .tuner { connection ->
-                                connection.connectTimeout = 30000
-                                connection.readTimeout = 30000
-                                connection.setRequestProperty("Authorization", "Bearer $accessToken")
-                                // Add session_id header only if sessionId is not null or empty
-                                if (!sessionId.isNullOrBlank()) {
-                                    connection.setRequestProperty("session_id", sessionId)
-                                    println("Debug: Setting session_id header to: $sessionId")
-                                } else {
-                                    println("Debug: No session_id to set")
+    // Make streaming API request in background
+    com.intellij.openapi.progress.ProgressManager.getInstance().run(
+        object : com.intellij.openapi.progress.Task.Backgroundable(
+            project,
+            "Consulting AI",
+            false
+        ) {
+            override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
+                try {
+                    // First, remove thinking message before streaming starts
+                    SwingUtilities.invokeLater {
+                        removeLastMessageIfThinking()
+                    }
+
+                    // Prepare headers
+                    val headers = mutableMapOf(
+                        "Authorization" to "Bearer $accessToken",
+                        "Content-Type" to "application/json"
+                    )
+
+                    if (!sessionId.isNullOrBlank()) {
+                        headers["session_id"] = sessionId
+                    }
+
+                    // Create a streaming response handler
+                    var fullResponse = ""
+                    var updatedSessionId: String? = sessionId
+                    var lineCount = 0
+
+                    // Make HTTP request with custom streaming handling
+                    HttpRequests
+                        .post(apiUrl, "application/json")
+                        .connectTimeout(30000)
+                        .readTimeout(300000)
+                        .tuner { connection ->
+                            headers.forEach { (key, value) ->
+                                connection.setRequestProperty(key, value)
+                            }
+                        }
+                        .connect { request ->
+                            request.write(payload.toString())
+
+                            val messagePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                                background = JBColor.background()
+                                border = JBUI.Borders.empty(JBUI.scale(12), JBUI.scale(16))
+
+                                // Create avatar label
+                                val avatarLabel = JLabel().apply {
+                                    icon = AllIcons.General.BalloonInformation
+                                    border = JBUI.Borders.emptyRight(JBUI.scale(12))
+                                    verticalAlignment = JLabel.TOP
+                                }
+
+                                // Create message text with wrapping
+                                val messageText = JTextArea().apply {
+                                    font = FontUtil.getBodyFont()
+                                    lineWrap = true
+                                    wrapStyleWord = true
+                                    isEditable = false
+                                    isOpaque = false
+                                    background = JBColor.background()
+                                    border = JBUI.Borders.empty()
+                                    minimumSize = Dimension(0, preferredSize.height)
+                                    maximumSize = Dimension(400, Int.MAX_VALUE)
+                                }
+
+                                add(avatarLabel, BorderLayout.WEST)
+                                add(messageText, BorderLayout.CENTER)
+                            }
+
+                            // Add the message panel to chat
+                            SwingUtilities.invokeLater {
+                                chatPanel.add(messagePanel)
+                                chatPanel.revalidate()
+                                chatPanel.repaint()
+                            }
+
+                            request.inputStream.bufferedReader().use { reader ->
+                                var line: String?
+                                while (reader.readLine().also { line = it } != null) {
+                                    lineCount++
+
+                                    if (line?.startsWith("data: ") == true) {
+                                        val data = line?.substring(6) ?: ""
+
+                                        if (data == "[DONE]") {
+                                            break
+                                        } else if (data.startsWith("{") && data.endsWith("}")) {
+                                            try {
+                                                val jsonData = JSONObject(data)
+                                                val sessionIdInJson = jsonData.optString("session_id", null)
+                                                if (sessionIdInJson != null) {
+                                                    updatedSessionId = sessionIdInJson
+                                                }
+                                            } catch (e: Exception) {
+                                                fullResponse += data
+                                                updateMessagePanel(messagePanel, fullResponse)
+                                            }
+                                        } else {
+                                            fullResponse += data
+                                            updateMessagePanel(messagePanel, fullResponse)
+                                        }
+                                    }
                                 }
                             }
-                            .connect { request ->
-                                request.write(payload.toString())
-                                request.getReader(null).readText()
-                            }
-                        SwingUtilities.invokeLater {
-                            // Remove thinking message
-                            removeLastMessageIfThinking()
-                            val json = JSONObject(response)
-                            appendMessage(json.optString("response", response), isUser = false)
 
-                            // --- Update session tracking ---
-                            val returnedSessionId = json.optString("session_id", null)
-                            if (!returnedSessionId.isNullOrBlank()) {
-                                currentSessionId = returnedSessionId
-                                println("Debug: Updated currentSessionId to: $currentSessionId")
-                            } else {
-                                println("Debug: No session_id returned in response")
-                            }
-                            inputField.isEnabled = true
-                            consultButton.isEnabled = true
-                            inputField.requestFocus()
+                            println("Stream complete. Processed $lineCount lines")
                         }
-                    } catch (e: Exception) {
-                        SwingUtilities.invokeLater {
-                            removeLastMessageIfThinking()
-                            if (e.message?.contains("401") == true || e.message?.contains("403") == true) {
-                                // Auth error - token might be invalid
-                                appendMessage("Your session has expired. Please sign in again.", isUser = false)
-                                authService.signOut()
-                                showLoginPanel()
-                            } else {
-                                // Other error
-                                appendMessage("Sorry, I encountered an error: ${e.message}", isUser = false)
-                            }
-                            inputField.isEnabled = true
-                            consultButton.isEnabled = true
-                            inputField.requestFocus()
+
+                    // Update session tracking and enable input
+                    SwingUtilities.invokeLater {
+                        currentSessionId = updatedSessionId
+                        inputField.isEnabled = true
+                        consultButton.isEnabled = true
+                        inputField.requestFocus()
+                    }
+
+                } catch (e: Exception) {
+                    println("API request error: ${e.message}")
+
+                    SwingUtilities.invokeLater {
+                        removeLastMessageIfThinking()
+                        if (e.message?.contains("401") == true || e.message?.contains("403") == true) {
+                            appendMessage("Your session has expired. Please sign in again.", isUser = false)
+                            authService.signOut()
+                            showLoginPanel()
+                        } else {
+                            appendMessage("Sorry, I encountered an error: ${e.message}", isUser = false)
                         }
+                        inputField.isEnabled = true
+                        consultButton.isEnabled = true
+                        inputField.requestFocus()
                     }
                 }
             }
-        )
+        }
+    )
+}
+
+    // Helper method to update message panel with streaming text
+    private fun updateMessagePanel(messagePanel: JBPanel<*>, text: String) {
+    SwingUtilities.invokeLater {
+        try {
+            val messageText = messagePanel.getComponent(1) as JTextArea
+            messageText.text = text
+
+            // Scroll to bottom
+            val vertical = chatScroll.verticalScrollBar
+            vertical.value = vertical.maximum
+
+            // Revalidate and repaint
+            messagePanel.revalidate()
+            messagePanel.repaint()
+            chatPanel.revalidate()
+            chatPanel.repaint()
+        } catch (e: Exception) {
+            println("Error updating message panel: ${e.message}")
+        }
     }
+}
 
 
     private fun removeLastMessageIfThinking() {
