@@ -153,11 +153,11 @@ jobs:
           VERSION: ${{ github.event.inputs.version }}
           BAID_CLIENT_ID: ${{ secrets.BAID_CLIENT_ID }}
           BAID_REDIRECT_URI: ${{ env.BAID_REDIRECT_URI || secrets.BAID_REDIRECT_URI }}
-          BAID_AUTH_ENDPOINT: ${{ secrets.BAID_AUTH_ENDPOINT }}
-          BAID_SCOPE: ${{ secrets.BAID_SCOPE }}
-          BAID_ACCESS_TYPE: ${{ secrets.BAID_ACCESS_TYPE }}
-          BAID_PROMPT: ${{ secrets.BAID_PROMPT }}
+          BAID_AUTH_ENDPOINT: ${{ env.BAID_AUTH_ENDPOINT }}
+          BAID_SCOPE: ${{ env.BAID_SCOPE }}
+          BAID_ACCESS_TYPE: ${{ env.BAID_ACCESS_TYPE }}
+          BAID_PROMPT: ${{ env.BAID_PROMPT }}
           BAID_BACKEND_URL: ${{ env.BAID_BACKEND_URL || secrets.BAID_BACKEND_URL }}
-          BAID_API_ENDPOINT: ${{ secrets.BAID_API_ENDPOINT }}
+          BAID_API_ENDPOINT: ${{ env.BAID_API_ENDPOINT }}
           BAID_BACKEND_TOKEN_KEY: ${{ secrets.BAID_BACKEND_TOKEN_KEY }}
           BAID_TOKEN_EXPIRY_KEY: ${{ secrets.BAID_TOKEN_EXPIRY_KEY }}
