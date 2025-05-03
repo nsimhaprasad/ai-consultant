@@ -241,8 +241,8 @@ jobs:
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --memory=256Mi \
-            --cpu=0.25 \
+            --memory=512Mi \
+            --cpu=0.50 \
             --port=8080 \
             --set-env-vars=AGENT_ENGINE_ID=$AGENT_PATH
 
