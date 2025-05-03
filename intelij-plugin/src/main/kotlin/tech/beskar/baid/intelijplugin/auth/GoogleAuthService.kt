@@ -16,6 +16,7 @@ import com.intellij.ui.components.JBPanel
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.ui.JBUI
 import org.json.JSONObject
+import tech.beskar.baid.intelijplugin.config.BaidConfiguration
 import tech.beskar.baid.intelijplugin.util.FontUtil
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -31,19 +32,12 @@ import javax.swing.SwingUtilities
 class GoogleAuthService {
     companion object {
         private val LOG = Logger.getInstance(GoogleAuthService::class.java)
-        private const val CLIENT_ID = "742371152853-usfgd7l7ccp3mkekku8ql3iol5m3d7oi.apps.googleusercontent.com"
-        private const val REDIRECT_URI = "http://localhost:8080/api/auth/google-login"
-        private const val AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/auth"
-        private const val SCOPE = "email profile" // Add other scopes as needed
-
-        // Credential store keys
-        private const val BACKEND_TOKEN_KEY = "baid_backend_token"
-        private const val TOKEN_EXPIRY_KEY = "baid_token_expiry"
 
         // Instance for service access
         fun getInstance(): GoogleAuthService = service()
     }
 
+    private val config = BaidConfiguration.getInstance()
     private var userInfo: UserInfo? = null
 
     data class UserInfo(
@@ -80,11 +74,10 @@ class GoogleAuthService {
     }
 
     // Start the OAuth flow and send code to backend for token exchange
-    fun startAuthFlow(project: Project, backendUrl: String): CompletableFuture<UserInfo> {
+    fun startAuthFlow(project: Project): CompletableFuture<UserInfo> {
         val resultFuture = CompletableFuture<UserInfo>()
         val state = UUID.randomUUID().toString()
-        val redirectUri = REDIRECT_URI
-        val authUrl = buildAuthUrl(redirectUri, state)
+        val authUrl = buildAuthUrl(state)
         ApplicationManager.getApplication().invokeLater({
             BrowserUtil.browse(authUrl)
         }, ModalityState.any())
@@ -95,7 +88,7 @@ class GoogleAuthService {
             val startTime = System.currentTimeMillis()
             while (System.currentTimeMillis() - startTime < maxWait) {
                 try {
-                    val response = HttpRequests.request("$backendUrl/api/auth/session?state=$state")
+                    val response = HttpRequests.request("${config.backendUrl}/api/auth/session?state=$state")
                         .accept("application/json")
                         .connectTimeout(5000)
                         .readTimeout(5000)
@@ -134,32 +127,32 @@ class GoogleAuthService {
     }
 
     // Build the authorization URL
-    private fun buildAuthUrl(redirectUri: String, state: String): String {
+    private fun buildAuthUrl(state: String): String {
         val params = mapOf(
-            "client_id" to CLIENT_ID,
-            "redirect_uri" to redirectUri,
+            "client_id" to config.clientId,
+            "redirect_uri" to config.redirectUri,
             "response_type" to "code",
-            "scope" to SCOPE,
+            "scope" to config.scope,
             "state" to state,
-            "access_type" to "offline",
-            "prompt" to "consent"
+            "access_type" to config.accessType,
+            "prompt" to config.prompt
         )
         val queryString = params.entries.joinToString("&") { (key, value) ->
             "$key=${URLEncoder.encode(value, StandardCharsets.UTF_8)}"
         }
-        return "$AUTH_ENDPOINT?$queryString"
+        return "${config.authEndpoint}?$queryString"
     }
 
     // Save backend token to secure storage
     private fun saveBackendToken(tokenInfo: BackendTokenInfo) {
         val backendTokenAttributes = CredentialAttributes(
-            generateServiceName("Baid", BACKEND_TOKEN_KEY)
+            generateServiceName("Baid", config.backendTokenKey)
         )
         val backendTokenCredential = Credentials("", tokenInfo.backendToken)
         PasswordSafe.instance.set(backendTokenAttributes, backendTokenCredential)
         val expiresAt = Instant.now().epochSecond + tokenInfo.expiresIn
         val expiryAttributes = CredentialAttributes(
-            generateServiceName("Baid", TOKEN_EXPIRY_KEY)
+            generateServiceName("Baid", config.tokenExpiryKey)
         )
         val expiryCredential = Credentials("", expiresAt.toString())
         PasswordSafe.instance.set(expiryAttributes, expiryCredential)
@@ -173,14 +166,14 @@ class GoogleAuthService {
 
     private fun getBackendToken(): String? {
         val attributes = CredentialAttributes(
-            generateServiceName("Baid", BACKEND_TOKEN_KEY)
+            generateServiceName("Baid", config.backendTokenKey)
         )
         return PasswordSafe.instance.getPassword(attributes)
     }
 
     private fun getTokenExpiry(): Long? {
         val attributes = CredentialAttributes(
-            generateServiceName("Baid", TOKEN_EXPIRY_KEY)
+            generateServiceName("Baid", config.tokenExpiryKey)
         )
         return PasswordSafe.instance.getPassword(attributes)?.toLongOrNull()
     }
@@ -194,11 +187,11 @@ class GoogleAuthService {
     // Clear all saved tokens
     private fun clearTokens() {
         val backendTokenAttributes = CredentialAttributes(
-            generateServiceName("Baid", BACKEND_TOKEN_KEY)
+            generateServiceName("Baid", config.backendTokenKey)
         )
         PasswordSafe.instance.set(backendTokenAttributes, null)
         val expiryAttributes = CredentialAttributes(
-            generateServiceName("Baid", TOKEN_EXPIRY_KEY)
+            generateServiceName("Baid", config.tokenExpiryKey)
         )
         PasswordSafe.instance.set(expiryAttributes, null)
     }
@@ -237,8 +230,7 @@ class LoginPanel(private val project: Project, private val onLoginComplete: (Goo
                     text = "Connecting..."
 
                     val authService = GoogleAuthService.getInstance()
-                    val backendUrl = "http://localhost:8080" // Replace with your backend URL
-                    authService.startAuthFlow(project, backendUrl)
+                    authService.startAuthFlow(project)
                         .thenAccept { userInfo ->
                             SwingUtilities.invokeLater {
                                 onLoginComplete(userInfo)

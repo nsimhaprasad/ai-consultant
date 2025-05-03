@@ -13,6 +13,7 @@ import com.intellij.util.ui.JBUI
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
 import tech.beskar.baid.intelijplugin.auth.LoginPanel
+import tech.beskar.baid.intelijplugin.config.BaidConfiguration
 import tech.beskar.baid.intelijplugin.util.FontUtil
 import java.awt.*
 import javax.swing.*
@@ -25,7 +26,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
     // Add auth service
     private val authService = GoogleAuthService.getInstance()
-    private val backendUrl = "http://localhost:8080"
+    private val config = BaidConfiguration.getInstance()
 
     // Add content panel to switch between login and main UI
     private val contentPanel = JBPanel<JBPanel<*>>(CardLayout())
@@ -35,7 +36,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     // User profile button reference
     private lateinit var userProfileButton: JButton
 
-    // --- SESSION MANAGEMENT ---
+    // SESSION MANAGEMENT
     private var currentSessionId: String? = null
     private lateinit var newSessionButton: JButton
 
@@ -84,7 +85,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 add(subtitleLabel)
             }
 
-            // --- Add new session (+) button to header ---
+            // Add new session (+) button to header
             newSessionButton = JButton(AllIcons.General.Add).apply {
                 toolTipText = "Start new session"
                 isContentAreaFilled = false
@@ -385,7 +386,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         // Add it back
         contentPanel.add(loginPanel, "login", 0)
 
-        // --- Reset session when logging out ---
+        // Reset session when logging out
         currentSessionId = null
 
         // Show the login panel
@@ -498,7 +499,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
     // Show thinking message
     appendMessage("Thinking...", isUser = false)
-    val apiUrl = "$backendUrl/consult"
+    val apiUrl = "${config.backendUrl}${config.apiEndpoint}"
 
     val payload = JSONObject(
         mapOf(
