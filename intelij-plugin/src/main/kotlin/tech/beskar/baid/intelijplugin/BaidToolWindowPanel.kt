@@ -399,36 +399,81 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     }
 
     fun appendMessage(message: String, isUser: Boolean) {
-        // Create message panel
+        // Create message panel with WhatsApp-like layout
         val messagePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
-            background = if (isUser) JBColor(Color(240, 240, 240), Color(60, 63, 65)) else JBColor.background()
-            border = JBUI.Borders.empty(JBUI.scale(12), JBUI.scale(16))
-
-            // Create avatar label
-            val avatarLabel = JLabel().apply {
-                icon = if (isUser) AllIcons.General.User else AllIcons.General.BalloonInformation
-                border = JBUI.Borders.emptyRight(JBUI.scale(12))
-                verticalAlignment = JLabel.TOP
-            }
-
-            // Create message text with wrapping
-            val messageText = JTextArea().apply {
-                text = message
-                font = FontUtil.getBodyFont()
-                lineWrap = true
-                wrapStyleWord = true
-                isEditable = false
-                isOpaque = false
-                background = if (isUser) JBColor(Color(240, 240, 240), Color(60, 63, 65)) else JBColor.background()
-                border = JBUI.Borders.empty()
-                minimumSize = Dimension(0, preferredSize.height)
-                maximumSize = Dimension(400, Int.MAX_VALUE)
-            }
-
-            // Add components to message panel
-            add(avatarLabel, BorderLayout.WEST)
-            add(messageText, BorderLayout.CENTER)
+            background = JBColor.background()
+            border = JBUI.Borders.empty(JBUI.scale(4), JBUI.scale(16))
         }
+
+        // Create message bubble container
+        val bubbleContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+            background = if (isUser) {
+                JBColor(Color(220, 248, 198), Color(54, 93, 69)) // Light green for user
+            } else {
+                JBColor(Color(255, 255, 255), Color(60, 63, 65)) // White/dark for agent
+            }
+            border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
+        }
+
+        // Create message text area
+        val messageText = JTextArea().apply {
+            text = message
+            font = FontUtil.getBodyFont()
+            lineWrap = true
+            wrapStyleWord = true
+            isEditable = false
+            isOpaque = false
+            background = Color(0, 0, 0, 0) // Transparent
+            foreground = if (isUser) Color.BLACK else JBColor.foreground()
+            border = JBUI.Borders.empty()
+            minimumSize = Dimension(0, preferredSize.height)
+            maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
+        }
+
+        // Add message text to bubble
+        bubbleContainer.add(messageText, BorderLayout.CENTER)
+
+        // Create message with avatar container
+        val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+            isOpaque = false
+
+            if (isUser) {
+                // User message: avatar on right, bubble on left
+                add(bubbleContainer, BorderLayout.CENTER)
+
+                val avatarLabel = JLabel().apply {
+                    icon = AllIcons.General.User
+                    border = JBUI.Borders.emptyLeft(JBUI.scale(8))
+                    verticalAlignment = JLabel.TOP
+                }
+                add(avatarLabel, BorderLayout.EAST)
+
+                // Add padding on the left to push message right
+                val spacer = JPanel().apply {
+                    isOpaque = false
+                    preferredSize = Dimension(JBUI.scale(100), 0) // Adjust width as needed
+                }
+                add(spacer, BorderLayout.WEST)
+            } else {
+                // Agent message: avatar on left, bubble on right
+                val avatarLabel = JLabel().apply {
+                    icon = AllIcons.General.BalloonInformation
+                    border = JBUI.Borders.emptyRight(JBUI.scale(8))
+                    verticalAlignment = JLabel.TOP
+                }
+                add(avatarLabel, BorderLayout.WEST)
+                add(bubbleContainer, BorderLayout.CENTER)
+
+                // Add padding on the right to keep message left-aligned
+                val spacer = JPanel().apply {
+                    isOpaque = false
+                    preferredSize = Dimension(JBUI.scale(100), 0) // Adjust width as needed
+                }
+                add(spacer, BorderLayout.EAST)
+            }
+        }
+
+        messagePanel.add(contentPanel, BorderLayout.CENTER)
 
         // Add message panel to chat panel
         SwingUtilities.invokeLater {
@@ -552,31 +597,52 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
                             val messagePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
                                 background = JBColor.background()
-                                border = JBUI.Borders.empty(JBUI.scale(12), JBUI.scale(16))
+                                border = JBUI.Borders.empty(JBUI.scale(4), JBUI.scale(16))
+                            }
 
-                                // Create avatar label
+                            // Create agent message with WhatsApp-like layout
+                            val bubbleContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                                background = JBColor(Color(255, 255, 255), Color(60, 63, 65))
+                                border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
+                            }
+
+                            // Create message text area
+                            val messageText = JTextArea().apply {
+                                font = FontUtil.getBodyFont()
+                                lineWrap = true
+                                wrapStyleWord = true
+                                isEditable = false
+                                isOpaque = false
+                                background = Color(0, 0, 0, 0)
+                                foreground = JBColor.foreground()
+                                border = JBUI.Borders.empty()
+                                minimumSize = Dimension(0, preferredSize.height)
+                                maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
+                            }
+
+                            bubbleContainer.add(messageText, BorderLayout.CENTER)
+
+                            // Create message with avatar container for agent response
+                            val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                                isOpaque = false
+
                                 val avatarLabel = JLabel().apply {
                                     icon = AllIcons.General.BalloonInformation
-                                    border = JBUI.Borders.emptyRight(JBUI.scale(12))
+                                    border = JBUI.Borders.emptyRight(JBUI.scale(8))
                                     verticalAlignment = JLabel.TOP
                                 }
-
-                                // Create message text with wrapping
-                                val messageText = JTextArea().apply {
-                                    font = FontUtil.getBodyFont()
-                                    lineWrap = true
-                                    wrapStyleWord = true
-                                    isEditable = false
-                                    isOpaque = false
-                                    background = JBColor.background()
-                                    border = JBUI.Borders.empty()
-                                    minimumSize = Dimension(0, preferredSize.height)
-                                    maximumSize = Dimension(400, Int.MAX_VALUE)
-                                }
-
                                 add(avatarLabel, BorderLayout.WEST)
-                                add(messageText, BorderLayout.CENTER)
+                                add(bubbleContainer, BorderLayout.CENTER)
+
+                                // Add padding on the right
+                                val spacer = JPanel().apply {
+                                    isOpaque = false
+                                    preferredSize = Dimension(JBUI.scale(100), 0)
+                                }
+                                add(spacer, BorderLayout.EAST)
                             }
+
+                            messagePanel.add(contentPanel, BorderLayout.CENTER)
 
                             // Add the message panel to chat
                             SwingUtilities.invokeLater {
@@ -651,7 +717,10 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     private fun updateMessagePanel(messagePanel: JBPanel<*>, text: String) {
     SwingUtilities.invokeLater {
         try {
-            val messageText = messagePanel.getComponent(1) as JTextArea
+            // Navigate through the panel structure to find the text area
+            val contentPanel = messagePanel.getComponent(0) as JBPanel<*>
+            val bubbleContainer = contentPanel.getComponent(1) as JBPanel<*>
+            val messageText = bubbleContainer.getComponent(0) as JTextArea
             messageText.text = text
 
             // Scroll to bottom
@@ -673,12 +742,19 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     private fun removeLastMessageIfThinking() {
         if (chatPanel.componentCount > 0) {
             val lastMessage = chatPanel.getComponent(chatPanel.componentCount - 1)
-            if (lastMessage is JBPanel<*> && lastMessage.border == JBUI.Borders.empty(JBUI.scale(12), JBUI.scale(16))) {
-                val messageText = lastMessage.getComponent(1) as JTextArea
-                if (messageText.text == "Thinking...") {
-                    chatPanel.remove(lastMessage)
-                    chatPanel.revalidate()
-                    chatPanel.repaint()
+            if (lastMessage is JBPanel<*> && lastMessage.border == JBUI.Borders.empty(JBUI.scale(4), JBUI.scale(16))) {
+                // Navigate through the panel structure to find the text area
+                try {
+                    val contentPanel = lastMessage.getComponent(0) as JBPanel<*>
+                    val bubbleContainer = contentPanel.getComponent(1) as JBPanel<*>
+                    val messageText = bubbleContainer.getComponent(0) as JTextArea
+                    if (messageText.text == "Thinking...") {
+                        chatPanel.remove(lastMessage)
+                        chatPanel.revalidate()
+                        chatPanel.repaint()
+                    }
+                } catch (e: Exception) {
+                    // If structure doesn't match, ignore
                 }
             }
         }
