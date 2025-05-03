@@ -20,8 +20,8 @@ resource "google_cloud_run_service" "default" {
         image = "gcr.io/cloudrun/hello"
         resources {
           limits = {
-            memory = "256Mi"
-            cpu    = "0.25"
+            memory = "512Mi"
+            cpu    = "0.50"
           }
         }
 #         env {
