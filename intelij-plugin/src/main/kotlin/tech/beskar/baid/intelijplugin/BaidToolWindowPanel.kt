@@ -10,12 +10,15 @@ import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.ui.JBUI
+import org.json.JSONArray
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
 import tech.beskar.baid.intelijplugin.auth.LoginPanel
 import tech.beskar.baid.intelijplugin.config.BaidConfiguration
 import tech.beskar.baid.intelijplugin.util.FontUtil
 import java.awt.*
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import javax.swing.*
 
 class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindowPanel>(BorderLayout()) {
@@ -40,6 +43,13 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     private var currentSessionId: String? = null
     private lateinit var newSessionButton: JButton
 
+    // PAST CONVERSATIONS
+    private lateinit var pastConversationsButton: JButton
+    private val pastConversationsPanel = JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(8)))
+    private val cardLayout = CardLayout()
+    private val chatContainer = JBPanel<JBPanel<*>>()
+    private var isShowingPastConversations = false
+
     init {
         // Set up the login panel
         loginPanel = LoginPanel(project) { userInfo ->
@@ -62,7 +72,12 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         chatScroll.verticalScrollBar.unitIncrement = JBUI.scale(16)
         chatScroll.border = JBUI.Borders.empty()
 
-        // Create header panel with only Baid branding
+        // Setup chat container with card layout to switch between chat and past conversations
+        chatContainer.layout = cardLayout
+        chatContainer.add(chatScroll, "chat")
+        chatContainer.add(createPastConversationsPanel(), "pastConversations")
+
+        // Create header panel with Baid branding and buttons
         val headerPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
             background = JBColor.background()
             border = JBUI.Borders.empty(JBUI.scale(16), JBUI.scale(16), JBUI.scale(8), JBUI.scale(16))
@@ -85,7 +100,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 add(subtitleLabel)
             }
 
-            // Add new session (+) button to header
+            // Add new session (+) button and past conversations button to header
             newSessionButton = JButton(AllIcons.General.Add).apply {
                 toolTipText = "Start new session"
                 isContentAreaFilled = false
@@ -97,9 +112,28 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                     appendMessage("Started a new session.", isUser = false)
                 }
             }
+
+            pastConversationsButton = JButton(AllIcons.General.ArrowRight).apply {
+                toolTipText = "Past conversations"
+                isContentAreaFilled = false
+                isBorderPainted = false
+                preferredSize = Dimension(JBUI.scale(32), JBUI.scale(32))
+                addActionListener {
+                    togglePastConversationsPanel()
+                }
+            }
+
+            val buttonsPanel = JBPanel<JBPanel<*>>().apply {
+                isOpaque = false
+                layout = BoxLayout(this, BoxLayout.X_AXIS)
+                add(pastConversationsButton)
+                add(Box.createHorizontalStrut(JBUI.scale(8)))
+                add(newSessionButton)
+            }
+
             val rightPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
                 isOpaque = false
-                add(newSessionButton, BorderLayout.EAST)
+                add(buttonsPanel, BorderLayout.EAST)
             }
 
             add(titleContainer, BorderLayout.WEST)
@@ -190,7 +224,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
         // Add components to the main panel
         mainPanel.add(headerPanel, BorderLayout.NORTH)
-        mainPanel.add(chatScroll, BorderLayout.CENTER)
+        mainPanel.add(chatContainer, BorderLayout.CENTER)
         mainPanel.add(inputAreaPanel, BorderLayout.SOUTH)
 
         // Set up content panel with both login and main panels
@@ -202,6 +236,305 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
         // Check if user is already authenticated in background
         checkAuthenticationStatus()
+    }
+
+    private fun createPastConversationsPanel(): JComponent {
+        val scrollPane = JBScrollPane(pastConversationsPanel)
+        scrollPane.border = JBUI.Borders.empty()
+        scrollPane.verticalScrollBar.unitIncrement = JBUI.scale(16)
+
+        // Title for Past Conversations
+        val titleLabel = JLabel("Past Conversations").apply {
+            font = FontUtil.getTitleFont()
+            foreground = JBColor.foreground()
+            border = JBUI.Borders.empty(JBUI.scale(16))
+            horizontalAlignment = SwingConstants.LEFT
+        }
+
+        // Panel to hold everything
+        val container = JBPanel<JBPanel<*>>(BorderLayout())
+        container.add(titleLabel, BorderLayout.NORTH)
+        container.add(scrollPane, BorderLayout.CENTER)
+
+        return container
+    }
+
+    private fun togglePastConversationsPanel() {
+        isShowingPastConversations = !isShowingPastConversations
+
+        if (isShowingPastConversations) {
+            loadPastConversations()
+            cardLayout.show(chatContainer, "pastConversations")
+            pastConversationsButton.icon = AllIcons.General.ArrowLeft
+            pastConversationsButton.toolTipText = "Back to current chat"
+        } else {
+            cardLayout.show(chatContainer, "chat")
+            pastConversationsButton.icon = AllIcons.General.ArrowRight
+            pastConversationsButton.toolTipText = "Past conversations"
+        }
+    }
+
+    private fun loadPastConversations() {
+        // Clear previous conversations
+        pastConversationsPanel.removeAll()
+
+        // Add loading indicator
+        val loadingLabel = JLabel("Loading conversations...", SwingConstants.CENTER)
+        pastConversationsPanel.add(loadingLabel)
+        pastConversationsPanel.revalidate()
+        pastConversationsPanel.repaint()
+
+        // Get current user ID
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val userInfo = authService.getUserInfo()
+                if (userInfo != null) {
+                    val userId = userInfo.email
+                    fetchUserSessions(userId)
+                } else {
+                    SwingUtilities.invokeLater {
+                        loadingLabel.text = "Please sign in to view past conversations"
+                    }
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    loadingLabel.text = "Error loading conversations: ${e.message}"
+                }
+            }
+        }
+    }
+
+    private fun fetchUserSessions(userId: String) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val accessToken = authService.getCurrentAccessToken()
+                if (accessToken == null) {
+                    SwingUtilities.invokeLater {
+                        pastConversationsPanel.removeAll()
+                        pastConversationsPanel.add(JLabel("Session expired. Please sign in again."))
+                        pastConversationsPanel.revalidate()
+                        pastConversationsPanel.repaint()
+                    }
+                    return@executeOnPooledThread
+                }
+
+                // Fetch sessions from the API
+                val apiUrl = "${config.backendUrl}/sessions/$userId"
+                val result = HttpRequests
+                    .request(apiUrl)
+                    .tuner { connection ->
+                        connection.setRequestProperty("Authorization", "Bearer $accessToken")
+                    }
+                    .readString()
+
+                val jsonResponse = JSONObject(result)
+                val sessions = jsonResponse.getJSONArray("sessions")
+
+                SwingUtilities.invokeLater {
+                    pastConversationsPanel.removeAll()
+
+                    if (sessions.length() == 0) {
+                        pastConversationsPanel.add(JLabel("No past conversations found"))
+                    } else {
+                        displaySessionsList(sessions, userId)
+                    }
+
+                    pastConversationsPanel.revalidate()
+                    pastConversationsPanel.repaint()
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    pastConversationsPanel.removeAll()
+                    pastConversationsPanel.add(JLabel("Error loading conversations: ${e.message}"))
+                    pastConversationsPanel.revalidate()
+                    pastConversationsPanel.repaint()
+                }
+            }
+        }
+    }
+
+    private fun displaySessionsList(sessions: JSONArray, userId: String) {
+        // Add title
+        val titleLabel = JLabel("Select a conversation to continue", SwingConstants.LEFT).apply {
+            font = FontUtil.getSubTitleFont()
+            foreground = JBColor.foreground().darker()
+            border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(16))
+        }
+        pastConversationsPanel.add(titleLabel)
+
+        // Add each session as a clickable panel
+        for (i in 0 until sessions.length()) {
+            val session = sessions.getJSONObject(i)
+            val sessionId = session.getString("session_id")
+            val lastUsed = session.getString("last_used_at")
+
+            // Format the date
+            val dateString = try {
+                val formatter = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                val date = formatter.parse(lastUsed)
+                val displayFormat = java.text.SimpleDateFormat("MM/dd/yyyy h:mm a")
+                displayFormat.format(date)
+            } catch (e: Exception) {
+                lastUsed
+            }
+
+            // Create a button-like panel for each session
+            val sessionPanel = JPanel(BorderLayout()).apply {
+                background = JBColor.background()
+                border = BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, 1, 0, JBColor.border()),
+                    JBUI.Borders.empty(JBUI.scale(12), JBUI.scale(16))
+                )
+                cursor = Cursor(Cursor.HAND_CURSOR)
+
+                // Get session history preview
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    try {
+                        val accessToken = authService.getCurrentAccessToken() ?: return@executeOnPooledThread
+                        val historyUrl = "${config.backendUrl}/history/$userId/$sessionId"
+                        val historyResult = HttpRequests
+                            .request(historyUrl)
+                            .tuner { connection ->
+                                connection.setRequestProperty("Authorization", "Bearer $accessToken")
+                            }
+                            .readString()
+
+                        val historyJson = JSONObject(historyResult)
+                        val messagesArray = historyJson.getJSONArray("history")
+
+                        // Find the first message from user and agent
+                        var firstUserMessage = ""
+
+                        for (j in 0 until messagesArray.length()) {
+                            val message = messagesArray.getJSONObject(j)
+                            if (message.getString("role") == "user") {
+                                firstUserMessage = message.getString("message")
+                                break
+                            }
+                        }
+
+                        // Create a preview of the conversation
+                        val previewText = if (firstUserMessage.isNotEmpty()) {
+                            if (firstUserMessage.length > 60) {
+                                "${firstUserMessage.substring(0, 60)}..."
+                            } else {
+                                firstUserMessage
+                            }
+                        } else {
+                            "Empty conversation"
+                        }
+
+                        SwingUtilities.invokeLater {
+                            val preview = JLabel(previewText).apply {
+                                foreground = JBColor.foreground()
+                            }
+                            add(preview, BorderLayout.CENTER)
+                            revalidate()
+                            repaint()
+                        }
+                    } catch (e: Exception) {
+                        SwingUtilities.invokeLater {
+                            val preview = JLabel("Failed to load preview: ${e.message}").apply {
+                                foreground = JBColor.foreground()
+                            }
+                            add(preview, BorderLayout.CENTER)
+                            revalidate()
+                            repaint()
+                        }
+                    }
+                }
+
+                // Add date as a secondary label
+                val dateLabel = JLabel(dateString).apply {
+                    foreground = JBColor.foreground().darker()
+                    font = font.deriveFont(Font.PLAIN, font.size - 1f)
+                    border = JBUI.Borders.emptyTop(JBUI.scale(4))
+                }
+                add(dateLabel, BorderLayout.SOUTH)
+
+                // Add click handler to load the conversation
+                addMouseListener(object : MouseAdapter() {
+                    override fun mouseClicked(e: MouseEvent) {
+                        loadConversation(userId, sessionId)
+                    }
+
+                    override fun mouseEntered(e: MouseEvent) {
+                        background = JBColor.background().brighter()
+                    }
+
+                    override fun mouseExited(e: MouseEvent) {
+                        background = JBColor.background()
+                    }
+                })
+            }
+
+            pastConversationsPanel.add(sessionPanel)
+        }
+    }
+
+    private fun loadConversation(userId: String, sessionId: String) {
+        // Set current session ID
+        currentSessionId = sessionId
+
+        // Close past conversations panel and return to chat
+        isShowingPastConversations = false
+        cardLayout.show(chatContainer, "chat")
+        pastConversationsButton.icon = AllIcons.General.ArrowRight
+        pastConversationsButton.toolTipText = "Past conversations"
+
+        // Clear current chat
+        clearChat()
+
+        // Show loading message
+        appendMessage("Loading conversation history...", isUser = false)
+
+        // Load conversation history
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val accessToken = authService.getCurrentAccessToken()
+                if (accessToken == null) {
+                    SwingUtilities.invokeLater {
+                        removeLastMessageIfThinking()
+                        appendMessage("Session expired. Please sign in again.", isUser = false)
+                    }
+                    return@executeOnPooledThread
+                }
+
+                // Fetch conversation history
+                val historyUrl = "${config.backendUrl}/history/$userId/$sessionId"
+                val historyResult = HttpRequests
+                    .request(historyUrl)
+                    .tuner { connection ->
+                        connection.setRequestProperty("Authorization", "Bearer $accessToken")
+                    }
+                    .readString()
+
+                val historyJson = JSONObject(historyResult)
+                val messagesArray = historyJson.getJSONArray("history")
+
+                // Remove loading message
+                SwingUtilities.invokeLater {
+                    removeLastMessageIfThinking()
+
+                    // Display conversation history
+                    for (i in 0 until messagesArray.length()) {
+                        val message = messagesArray.getJSONObject(i)
+                        val role = message.getString("role")
+                        val content = message.getString("message")
+
+                        appendMessage(content, isUser = role == "user")
+                    }
+
+                    // Add a separator to indicate where the new messages will start
+                    appendMessage("Continuing this conversation. Any new messages will be part of this session.", isUser = false)
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    removeLastMessageIfThinking()
+                    appendMessage("Error loading conversation: ${e.message}", isUser = false)
+                }
+            }
+        }
     }
 
     private fun updateUserProfileButton() {
@@ -533,211 +866,210 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         }
     }
 
-   private fun performAPIRequest(userPrompt: String, accessToken: String, sessionId: String?) {
-    println("Starting API request with sessionId: $sessionId")
+    private fun performAPIRequest(userPrompt: String, accessToken: String, sessionId: String?) {
+        println("Starting API request with sessionId: $sessionId")
 
-    inputField.isEnabled = false
-    consultButton.isEnabled = false
-    val editor = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).selectedTextEditor
-    val document = editor?.document
-    val fileText = document?.text ?: "No file open."
+        inputField.isEnabled = false
+        consultButton.isEnabled = false
+        val editor = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).selectedTextEditor
+        val document = editor?.document
+        val fileText = document?.text ?: "No file open."
 
-    // Show thinking message
-    appendMessage("Thinking...", isUser = false)
-    val apiUrl = "${config.backendUrl}${config.apiEndpoint}"
+        // Show thinking message
+        appendMessage("Thinking...", isUser = false)
+        val apiUrl = "${config.backendUrl}${config.apiEndpoint}"
 
-    val payload = JSONObject(
-        mapOf(
-            "prompt" to userPrompt,
-            "file_content" to fileText
+        val payload = JSONObject(
+            mapOf(
+                "prompt" to userPrompt,
+                "file_content" to fileText
+            )
         )
-    )
 
-    // Make streaming API request in background
-    com.intellij.openapi.progress.ProgressManager.getInstance().run(
-        object : com.intellij.openapi.progress.Task.Backgroundable(
-            project,
-            "Consulting AI",
-            false
-        ) {
-            override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
-                try {
-                    // First, remove thinking message before streaming starts
-                    SwingUtilities.invokeLater {
-                        removeLastMessageIfThinking()
-                    }
-
-                    // Prepare headers
-                    val headers = mutableMapOf(
-                        "Authorization" to "Bearer $accessToken",
-                        "Content-Type" to "application/json"
-                    )
-
-                    if (!sessionId.isNullOrBlank()) {
-                        headers["session_id"] = sessionId
-                    }
-
-                    // Create a streaming response handler
-                    var fullResponse = ""
-                    var updatedSessionId: String? = sessionId
-                    var lineCount = 0
-
-                    // Make HTTP request with custom streaming handling
-                    HttpRequests
-                        .post(apiUrl, "application/json")
-                        .connectTimeout(30000)
-                        .readTimeout(300000)
-                        .tuner { connection ->
-                            headers.forEach { (key, value) ->
-                                connection.setRequestProperty(key, value)
-                            }
+        // Make streaming API request in background
+        com.intellij.openapi.progress.ProgressManager.getInstance().run(
+            object : com.intellij.openapi.progress.Task.Backgroundable(
+                project,
+                "Consulting AI",
+                false
+            ) {
+                override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
+                    try {
+                        // First, remove thinking message before streaming starts
+                        SwingUtilities.invokeLater {
+                            removeLastMessageIfThinking()
                         }
-                        .connect { request ->
-                            request.write(payload.toString())
 
-                            val messagePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
-                                background = JBColor.background()
-                                border = JBUI.Borders.empty(JBUI.scale(4), JBUI.scale(16))
-                            }
+                        // Prepare headers
+                        val headers = mutableMapOf(
+                            "Authorization" to "Bearer $accessToken",
+                            "Content-Type" to "application/json"
+                        )
 
-                            // Create agent message with WhatsApp-like layout
-                            val bubbleContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
-                                background = JBColor(Color(255, 255, 255), Color(60, 63, 65))
-                                border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
-                            }
+                        if (!sessionId.isNullOrBlank()) {
+                            headers["session_id"] = sessionId
+                        }
 
-                            // Create message text area
-                            val messageText = JTextArea().apply {
-                                font = FontUtil.getBodyFont()
-                                lineWrap = true
-                                wrapStyleWord = true
-                                isEditable = false
-                                isOpaque = false
-                                background = Color(0, 0, 0, 0)
-                                foreground = JBColor.foreground()
-                                border = JBUI.Borders.empty()
-                                minimumSize = Dimension(0, preferredSize.height)
-                                maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
-                            }
+                        // Create a streaming response handler
+                        var fullResponse = ""
+                        var updatedSessionId: String? = sessionId
+                        var lineCount = 0
 
-                            bubbleContainer.add(messageText, BorderLayout.CENTER)
-
-                            // Create message with avatar container for agent response
-                            val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
-                                isOpaque = false
-
-                                val avatarLabel = JLabel().apply {
-                                    icon = AllIcons.General.BalloonInformation
-                                    border = JBUI.Borders.emptyRight(JBUI.scale(8))
-                                    verticalAlignment = JLabel.TOP
+                        // Make HTTP request with custom streaming handling
+                        HttpRequests
+                            .post(apiUrl, "application/json")
+                            .connectTimeout(30000)
+                            .readTimeout(300000)
+                            .tuner { connection ->
+                                headers.forEach { (key, value) ->
+                                    connection.setRequestProperty(key, value)
                                 }
-                                add(avatarLabel, BorderLayout.WEST)
-                                add(bubbleContainer, BorderLayout.CENTER)
+                            }
+                            .connect { request ->
+                                request.write(payload.toString())
 
-                                // Add padding on the right
-                                val spacer = JPanel().apply {
+                                val messagePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                                    background = JBColor.background()
+                                    border = JBUI.Borders.empty(JBUI.scale(4), JBUI.scale(16))
+                                }
+
+                                // Create agent message with WhatsApp-like layout
+                                val bubbleContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                                    background = JBColor(Color(255, 255, 255), Color(60, 63, 65))
+                                    border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
+                                }
+
+                                // Create message text area
+                                val messageText = JTextArea().apply {
+                                    font = FontUtil.getBodyFont()
+                                    lineWrap = true
+                                    wrapStyleWord = true
+                                    isEditable = false
                                     isOpaque = false
-                                    preferredSize = Dimension(JBUI.scale(100), 0)
+                                    background = Color(0, 0, 0, 0)
+                                    foreground = JBColor.foreground()
+                                    border = JBUI.Borders.empty()
+                                    minimumSize = Dimension(0, preferredSize.height)
+                                    maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
                                 }
-                                add(spacer, BorderLayout.EAST)
-                            }
 
-                            messagePanel.add(contentPanel, BorderLayout.CENTER)
+                                bubbleContainer.add(messageText, BorderLayout.CENTER)
 
-                            // Add the message panel to chat
-                            SwingUtilities.invokeLater {
-                                chatPanel.add(messagePanel)
-                                chatPanel.revalidate()
-                                chatPanel.repaint()
-                            }
+                                // Create message with avatar container for agent response
+                                val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                                    isOpaque = false
 
-                            request.inputStream.bufferedReader().use { reader ->
-                                var line: String?
-                                while (reader.readLine().also { line = it } != null) {
-                                    lineCount++
+                                    val avatarLabel = JLabel().apply {
+                                        icon = AllIcons.General.BalloonInformation
+                                        border = JBUI.Borders.emptyRight(JBUI.scale(8))
+                                        verticalAlignment = JLabel.TOP
+                                    }
+                                    add(avatarLabel, BorderLayout.WEST)
+                                    add(bubbleContainer, BorderLayout.CENTER)
 
-                                    if (line?.startsWith("data: ") == true) {
-                                        val data = line?.substring(6) ?: ""
+                                    // Add padding on the right
+                                    val spacer = JPanel().apply {
+                                        isOpaque = false
+                                        preferredSize = Dimension(JBUI.scale(100), 0)
+                                    }
+                                    add(spacer, BorderLayout.EAST)
+                                }
 
-                                        if (data == "[DONE]") {
-                                            break
-                                        } else if (data.startsWith("{") && data.endsWith("}")) {
-                                            try {
-                                                val jsonData = JSONObject(data)
-                                                val sessionIdInJson = jsonData.optString("session_id", null)
-                                                if (sessionIdInJson != null) {
-                                                    updatedSessionId = sessionIdInJson
+                                messagePanel.add(contentPanel, BorderLayout.CENTER)
+
+                                // Add the message panel to chat
+                                SwingUtilities.invokeLater {
+                                    chatPanel.add(messagePanel)
+                                    chatPanel.revalidate()
+                                    chatPanel.repaint()
+                                }
+
+                                request.inputStream.bufferedReader().use { reader ->
+                                    var line: String?
+                                    while (reader.readLine().also { line = it } != null) {
+                                        lineCount++
+
+                                        if (line?.startsWith("data: ") == true) {
+                                            val data = line?.substring(6) ?: ""
+
+                                            if (data == "[DONE]") {
+                                                break
+                                            } else if (data.startsWith("{") && data.endsWith("}")) {
+                                                try {
+                                                    val jsonData = JSONObject(data)
+                                                    val sessionIdInJson = jsonData.optString("session_id", null)
+                                                    if (sessionIdInJson != null && sessionIdInJson.isNotEmpty()) {
+                                                        updatedSessionId = sessionIdInJson
+                                                    }
+                                                } catch (e: Exception) {
+                                                    fullResponse += data
+                                                    updateMessagePanel(messagePanel, fullResponse)
                                                 }
-                                            } catch (e: Exception) {
+                                            } else {
                                                 fullResponse += data
                                                 updateMessagePanel(messagePanel, fullResponse)
                                             }
-                                        } else {
-                                            fullResponse += data
-                                            updateMessagePanel(messagePanel, fullResponse)
                                         }
                                     }
                                 }
+
+                                println("Stream complete. Processed $lineCount lines")
                             }
 
-                            println("Stream complete. Processed $lineCount lines")
+                        // Update session tracking and enable input
+                        SwingUtilities.invokeLater {
+                            currentSessionId = updatedSessionId
+                            inputField.isEnabled = true
+                            consultButton.isEnabled = true
+                            inputField.requestFocus()
                         }
 
-                    // Update session tracking and enable input
-                    SwingUtilities.invokeLater {
-                        currentSessionId = updatedSessionId
-                        inputField.isEnabled = true
-                        consultButton.isEnabled = true
-                        inputField.requestFocus()
-                    }
+                    } catch (e: Exception) {
+                        println("API request error: ${e.message}")
 
-                } catch (e: Exception) {
-                    println("API request error: ${e.message}")
-
-                    SwingUtilities.invokeLater {
-                        removeLastMessageIfThinking()
-                        if (e.message?.contains("401") == true || e.message?.contains("403") == true) {
-                            appendMessage("Your session has expired. Please sign in again.", isUser = false)
-                            authService.signOut()
-                            showLoginPanel()
-                        } else {
-                            appendMessage("Sorry, I encountered an error: ${e.message}", isUser = false)
+                        SwingUtilities.invokeLater {
+                            removeLastMessageIfThinking()
+                            if (e.message?.contains("401") == true || e.message?.contains("403") == true) {
+                                appendMessage("Your session has expired. Please sign in again.", isUser = false)
+                                authService.signOut()
+                                showLoginPanel()
+                            } else {
+                                appendMessage("Sorry, I encountered an error: ${e.message}", isUser = false)
+                            }
+                            inputField.isEnabled = true
+                            consultButton.isEnabled = true
+                            inputField.requestFocus()
                         }
-                        inputField.isEnabled = true
-                        consultButton.isEnabled = true
-                        inputField.requestFocus()
                     }
                 }
             }
-        }
-    )
-}
+        )
+    }
 
     // Helper method to update message panel with streaming text
     private fun updateMessagePanel(messagePanel: JBPanel<*>, text: String) {
-    SwingUtilities.invokeLater {
-        try {
-            // Navigate through the panel structure to find the text area
-            val contentPanel = messagePanel.getComponent(0) as JBPanel<*>
-            val bubbleContainer = contentPanel.getComponent(1) as JBPanel<*>
-            val messageText = bubbleContainer.getComponent(0) as JTextArea
-            messageText.text = text
+        SwingUtilities.invokeLater {
+            try {
+                // Navigate through the panel structure to find the text area
+                val contentPanel = messagePanel.getComponent(0) as JBPanel<*>
+                val bubbleContainer = contentPanel.getComponent(1) as JBPanel<*>
+                val messageText = bubbleContainer.getComponent(0) as JTextArea
+                messageText.text = text
 
-            // Scroll to bottom
-            val vertical = chatScroll.verticalScrollBar
-            vertical.value = vertical.maximum
+                // Scroll to bottom
+                val vertical = chatScroll.verticalScrollBar
+                vertical.value = vertical.maximum
 
-            // Revalidate and repaint
-            messagePanel.revalidate()
-            messagePanel.repaint()
-            chatPanel.revalidate()
-            chatPanel.repaint()
-        } catch (e: Exception) {
-            println("Error updating message panel: ${e.message}")
+                // Revalidate and repaint
+                messagePanel.revalidate()
+                messagePanel.repaint()
+                chatPanel.revalidate()
+                chatPanel.repaint()
+            } catch (e: Exception) {
+                println("Error updating message panel: ${e.message}")
+            }
         }
     }
-}
-
 
     private fun removeLastMessageIfThinking() {
         if (chatPanel.componentCount > 0) {
