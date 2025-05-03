@@ -251,8 +251,16 @@ def session_exists(user_id, session_id):
     return result is not None
 
 
-# Agent configuration
 AGENT_ENGINE_ID = 'projects/742371152853/locations/us-central1/reasoningEngines/988619283045023744'
+if not AGENT_ENGINE_ID and os.path.exists("../agent_resource.txt"):
+    with open("../agent_resource.txt") as f:
+        AGENT_ENGINE_ID = f.read().strip()
+if not AGENT_ENGINE_ID:
+    AGENT_ENGINE_ID = os.getenv("DEFAULT_AGENT_ENGINE_ID", "5899794676692549632")
+
+
+# Agent configuration
+# AGENT_ENGINE_ID = 'projects/742371152853/locations/us-central1/reasoningEngines/988619283045023744'
 PROJECT_ID = os.getenv("PROJECT_ID", "742371152853")
 LOCATION = os.getenv("LOCATION", "us-central1")
 AGENT_ENGINE_ID_ONLY = AGENT_ENGINE_ID.split('/')[-1]
