@@ -70,7 +70,7 @@
   }
 
   .title {
-    @apply font-['Inter'] font-black;
+    @apply font-['Outfit'] font-thin tracking-tight;
   }
 
   .gradient-text {
