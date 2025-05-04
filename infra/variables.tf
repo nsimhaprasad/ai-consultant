@@ -42,5 +42,5 @@ variable "website_cloud_run_service_name" {
 variable "website_image" {
   description = "Docker image for website frontend"
   type        = string
-  default     = "gcr.io/ai-consultant-458311/website-frontend:latest"
+  default     = "gcr.io/cloudrun/hello"
 }
