@@ -182,7 +182,7 @@ const PricingPage: React.FC = () => {
             className="text-center mb-12"
           >
             <h2 className="mb-4">
-              <span className="gradient-text">Frequently Asked Questions</span>
+              <span className="gradient-text sub-heading">Frequently Asked Questions</span>
             </h2>
             <p className="text-lg text-surface-300 max-w-2xl mx-auto">
               Find answers to common questions about our pricing and features.

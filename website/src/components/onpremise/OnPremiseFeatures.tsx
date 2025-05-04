@@ -85,7 +85,7 @@ const OnPremiseFeatures: React.FC = () => {
           className="text-center mb-16"
         >
           <h2 className="mb-4">
-            <span className="gradient-text">Enterprise-Grade Security & Control</span>
+            <span className="gradient-text sub-heading">Enterprise-Grade Security & Control</span>
           </h2>
           <p className="text-lg text-surface-300 max-w-2xl mx-auto">
             Our on-premise solution is designed for organizations that require the highest 

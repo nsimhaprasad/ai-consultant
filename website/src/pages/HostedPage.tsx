@@ -82,7 +82,7 @@ const HostedPage: React.FC = () => {
             className="text-center mb-16"
           >
             <h2 className="mb-4">
-              <span className="gradient-text">Hosted Solution Benefits</span>
+              <span className="gradient-text sub-heading">Hosted Solution Benefits</span>
             </h2>
             <p className="text-lg text-surface-300 max-w-2xl mx-auto">
               Get all the power of Baid.dev without worrying about infrastructure,

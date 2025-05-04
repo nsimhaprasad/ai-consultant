@@ -22,13 +22,13 @@ const Hero: React.FC = () => {
             className="flex flex-col items-start"
           >
             <div className="mb-6">
-              <span className="badge badge-primary mb-4">Intelligent Coding Assistant</span>
-              <h1 className="mb-6 title">
-                <span className="gradient-text">Realize Your Ideas</span>
+              <span className="badge badge-primary mb-8">Intelligent Coding Assistant</span>
+              <h1 className="mb-8 title">
+                <span className="gradient-text">A B2B Coding Agent</span>
                 <br />
-                With Clean Code
+                with Clean Code
               </h1>
-              <p className="text-lg md:text-xl text-surface-300 mb-8 max-w-lg">
+              <p className="text-lg md:text-xl text-surface-300 mb-8 max-w-lg md:leading-loose">
                 A powerful coding agent that helps developers write better code, 
                 refactor existing solutions, and debug complex problems efficiently.
               </p>

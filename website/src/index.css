@@ -73,6 +73,10 @@
     @apply font-['Outfit'] font-thin tracking-tight;
   }
 
+  .sub-heading {
+    @apply font-black;
+  }
+
   .gradient-text {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-secondary-400;
   }

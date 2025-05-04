@@ -89,7 +89,7 @@ const Testimonials: React.FC = () => {
           className="text-center mb-16"
         >
           <h2 className="mb-4">
-            <span className="gradient-text">What Developers Are Saying</span>
+            <span className="gradient-text sub-heading">What Developers Are Saying</span>
           </h2>
           <p className="text-lg text-surface-300 max-w-2xl mx-auto">
             Trusted by development teams of all sizes, from startups to enterprise
