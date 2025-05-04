@@ -7,7 +7,7 @@ import WaitlistForm from '../components/waitlist/WaitlistForm';
 
 const HostedPage: React.FC = () => {
   useEffect(() => {
-    document.title = 'Hosted Solution - Baid.dev';
+    document.title = 'baid - Hosted';
   }, []);
 
   const [topRef, topInView] = useInView({
@@ -45,7 +45,7 @@ const HostedPage: React.FC = () => {
                   Without the Setup Hassle
                 </h1>
                 <p className="text-lg md:text-xl text-surface-300 mb-8 max-w-lg">
-                  Our fully managed cloud solution gives you all the power of Baid.dev
+                  Our fully managed cloud solution gives you all the power of <b>baid</b>
                   with zero infrastructure maintenance, automatic updates, and immediate
                   availability.
                 </p>
@@ -85,7 +85,7 @@ const HostedPage: React.FC = () => {
               <span className="gradient-text sub-heading">Hosted Solution Benefits</span>
             </h2>
             <p className="text-lg text-surface-300 max-w-2xl mx-auto">
-              Get all the power of Baid.dev without worrying about infrastructure,
+              Get all the power of <b>baid without worrying about infrastructure,</b>
               updates, or maintenance.
             </p>
           </motion.div>
@@ -96,7 +96,7 @@ const HostedPage: React.FC = () => {
               <Bot className="h-8 w-8 text-primary-500 mb-4" />
               <h3 className="text-xl font-semibold mb-2">Zero Setup Time</h3>
               <p className="text-surface-300 mb-4">
-                Start using Baid.dev immediately after sign-up with no complex
+                Start using <b>baid immediately after sign-up with no complex</b>
                 configuration or installation required.
               </p>
               <ul className="space-y-2">

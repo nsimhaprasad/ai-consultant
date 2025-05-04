@@ -29,14 +29,14 @@ const Hero: React.FC = () => {
                 with Clean Code
               </h1>
               <p className="text-lg md:text-xl text-surface-300 mb-8 max-w-lg md:leading-loose">
-                A powerful coding agent that helps developers write better code, 
+                A powerful clean coding agent that helps developers write better code,
                 refactor existing solutions, and debug complex problems efficiently.
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
               <Link to="/hosted" className="btn btn-primary">
-                Try Hosted Solution
+                Try now
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <Link to="/on-premise" className="btn btn-outline">

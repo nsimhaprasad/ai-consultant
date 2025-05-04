@@ -33,7 +33,7 @@ const Navbar: React.FC = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 text-white">
             <Bot className="h-8 w-8 text-primary-500" />
-            <span className="text-xl font-bold">baid.dev</span>
+            <span className="text-xl font-black">baid</span>
           </Link>
 
           {/* Desktop Navigation */}

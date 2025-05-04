@@ -5,7 +5,7 @@ import PricingCard from '../components/pricing/PricingCard';
 
 const PricingPage: React.FC = () => {
   useEffect(() => {
-    document.title = 'Pricing - Baid.dev';
+    document.title = 'Pricing - <b>baid';
   }, []);
 
   const [headerRef, headerInView] = useInView({
@@ -137,7 +137,7 @@ const PricingPage: React.FC = () => {
               <span className="gradient-text">Simple, Transparent Pricing</span>
             </h1>
             <p className="text-lg md:text-xl text-surface-300 mb-8">
-              Choose the plan that best fits your needs. All plans include core Baid.dev features
+              Choose the plan that best fits your needs. All plans include core <b>baid</b> features
               with different resource limits and capabilities.
             </p>
           </motion.div>

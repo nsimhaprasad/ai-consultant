@@ -13,7 +13,7 @@ const Footer: React.FC = () => {
           <div className="col-span-1 md:col-span-1">
             <Link to="/" className="flex items-center space-x-2 text-white mb-4">
               <Bot className="h-8 w-8 text-primary-500" />
-              <span className="text-xl font-bold">baid.dev</span>
+              <span className="text-2xl font-black">baid</span>
             </Link>
             <p className="text-surface-400 mb-4">
               A clean coding agent that helps you realize your ideas, available in hosted and on-premise versions.

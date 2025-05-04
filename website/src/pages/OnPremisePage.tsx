@@ -7,7 +7,7 @@ import OnPremiseFeatures from '../components/onpremise/OnPremiseFeatures';
 
 const OnPremisePage: React.FC = () => {
   useEffect(() => {
-    document.title = 'On-Premise Solution - Baid.dev';
+    document.title = 'On-Premise Solution - <b>baid';
   }, []);
 
   const [topRef, topInView] = useInView({
@@ -45,7 +45,7 @@ const OnPremisePage: React.FC = () => {
                   Over Your Environment
                 </h1>
                 <p className="text-lg md:text-xl text-surface-300 mb-8 max-w-lg">
-                  Our enterprise-grade on-premise solution lets you deploy Baid.dev entirely 
+                  Our enterprise-grade on-premise solution lets you deploy <b>baid</b> entirely
                   within your own infrastructure, ensuring maximum security, control, and 
                   compliance.
                 </p>
@@ -131,7 +131,7 @@ const OnPremisePage: React.FC = () => {
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold mb-4">Request On-Premise Information</h2>
               <p className="text-surface-300 max-w-2xl mx-auto">
-                Interested in deploying Baid.dev in your own environment? Contact our sales team
+                Interested in deploying <b>baid</b> in your own environment? Contact our sales team
                 to discuss your specific requirements and get a custom quote.
               </p>
             </div>

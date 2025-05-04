@@ -86,7 +86,7 @@ const Features: React.FC = () => {
             <span className="gradient-text sub-heading">Powerful Features</span>
           </h2>
           <p className="text-lg text-surface-300 max-w-2xl mx-auto">
-            Baid.dev comes packed with features to help developers write better code faster,
+            <b>baid</b> comes packed with features to help developers write better code faster,
             debug more efficiently, and maintain high-quality codebases.
           </p>
         </motion.div>

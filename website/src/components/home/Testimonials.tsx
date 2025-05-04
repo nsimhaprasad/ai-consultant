@@ -57,7 +57,7 @@ const Testimonials: React.FC = () => {
   const testimonials = [
     {
       quote:
-        "Baid.dev has completely transformed our development workflow. The debugging assistance alone has saved our team countless hours of frustration.",
+        "Baid has completely transformed our development workflow. The debugging assistance alone has saved our team countless hours of frustration.",
       author: "Sarah Johnson",
       role: "CTO",
       company: "TechFlow Inc.",
@@ -71,7 +71,7 @@ const Testimonials: React.FC = () => {
     },
     {
       quote:
-        "Our junior developers have improved dramatically since we started using Baid.dev. The code recommendations and best practice suggestions are like having a senior mentor available 24/7.",
+        "Our junior developers have improved dramatically since we started using Baid. The code recommendations and best practice suggestions are like having a senior mentor available 24/7.",
       author: "Alicia Rodriguez",
       role: "Engineering Manager",
       company: "Innovate Software",

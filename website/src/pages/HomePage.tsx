@@ -6,7 +6,7 @@ import CTASection from '../components/home/CTASection';
 
 const HomePage: React.FC = () => {
   useEffect(() => {
-    document.title = 'Baid.dev - Clean Coding Agent';
+    document.title = 'baid - Clean Coding Agent';
   }, []);
 
   return (

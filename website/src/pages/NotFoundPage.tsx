@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 
 const NotFoundPage: React.FC = () => {
   useEffect(() => {
-    document.title = 'Page Not Found - Baid.dev';
+    document.title = 'Page Not Found - baid';
   }, []);
 
   return (
