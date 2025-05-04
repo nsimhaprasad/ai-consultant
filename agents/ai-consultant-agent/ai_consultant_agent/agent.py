@@ -1,8 +1,9 @@
 import os
 import json
 import logging
-from google.adk import Agent, MultiAgentExecutor
-from typing import List, Optional
+from google.adk import Agent
+from google.adk.agents import ParallelAgent, SequentialAgent
+from typing import List, Optional, Dict, Any
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +23,7 @@ def get_development_principles() -> str:
     return "\n".join(principles)
 
 
-def suggest_development_approach(project_description: str) -> str:
+async def suggest_development_approach(project_description: str) -> str:
     """Tool function that suggests the best development approach(es) for a project."""
     principles_list = get_development_principles()
     return f"""
@@ -36,7 +37,7 @@ def suggest_development_approach(project_description: str) -> str:
     """
 
 
-def refactor_code(code_snippet: str, target_principle: Optional[str] = None) -> str:
+async def refactor_code(code_snippet: str, target_principle: Optional[str] = None) -> str:
     """Tool function that suggests refactoring improvements for provided code."""
     return f"""
     Analyze the following code:
@@ -50,7 +51,7 @@ def refactor_code(code_snippet: str, target_principle: Optional[str] = None) -> 
     """
 
 
-def generate_tests(code_snippet: str, test_framework: Optional[str] = None) -> str:
+async def generate_tests(code_snippet: str, test_framework: Optional[str] = None) -> str:
     """Tool function that generates test cases for provided code."""
     return f"""
     Analyze the following code:
@@ -66,52 +67,6 @@ def generate_tests(code_snippet: str, test_framework: Optional[str] = None) -> s
     """
 
 
-# --- Selection Logic ---
-def select_best_response(responses):
-    """
-    Basic selector function that selects the best response from multiple agents.
-
-    This implementation uses a simple scoring system based on:
-    - Response length (longer responses are often more comprehensive)
-    - Presence of code examples
-    - Presence of explanations
-    """
-    logger.info(f"Selecting best response from {len(responses)} responses")
-
-    best_response = None
-    max_score = -1
-
-    for agent_name, response in responses.items():
-        # Simple scoring heuristic
-        score = len(response) * 0.01  # Length contributes to score but not overwhelmingly
-
-        # Code examples are valuable
-        if "```" in response:
-            score += 10
-            # More code blocks are better
-            score += response.count("```") * 3
-
-        # Explanations are valuable
-        if "because" in response.lower() or "reason" in response.lower():
-            score += 8
-
-        # Examples are valuable
-        if "example" in response.lower() or "instance" in response.lower():
-            score += 5
-
-        # Structure improves readability
-        if response.count("#") > 2:  # Markdown headers
-            score += 5
-
-        logger.info(f"Agent {agent_name} score: {score:.2f}")
-
-        if score > max_score:
-            max_score = score
-            best_response = response
-
-    return best_response
-
-
 # --- Individual Agents ---
 # Gemini agent
 gemini_agent = Agent(
@@ -120,6 +75,7 @@ gemini_agent = Agent(
     instruction='Help developers write clean, maintainable code following best practices in software development. Provide guidance on testing, refactoring, and implementing design principles.',
     model="gemini-2.0-flash",
     tools=[suggest_development_approach, refactor_code, generate_tests],
+    output_key="gemini_response"  # Store result in session state
 )
 
 # Claude agent - using direct Vertex AI endpoint string
@@ -127,16 +83,42 @@ claude_agent = Agent(
     name='BAID_claude_agent',
     description='BESKAR.TECH development assistant that helps write code, refactor, create tests, and follow principles like TDD and SOLID.',
     instruction='Help developers write clean, maintainable code following best practices in software development. Provide guidance on testing, refactoring, and implementing design principles.',
-    model="publishers/anthropic/models/claude-3-7-sonnet@20250219",  # Direct Vertex AI model reference
+    model="claude-3-7-sonnet@20250219",  # Using the shortened version that works in your environment
     tools=[suggest_development_approach, refactor_code, generate_tests],
+    output_key="claude_response"  # Store result in session state
 )
 
-# --- Multi-Agent Executor ---
-multi_agent = MultiAgentExecutor(
+# Parallel execution of both models
+parallel_execution = ParallelAgent(
+    name="parallel_model_exec",
+    sub_agents=[gemini_agent, claude_agent]
+)
+
+# Response selector agent - will choose the best response
+selector_agent = Agent(
+    name="response_selector",
+    description="Selects the best response from multiple model outputs",
+    instruction="""
+    Compare the responses stored in state keys 'gemini_response' and 'claude_response'.
+    Select the response that is most comprehensive, well-explained, and helpful.
+
+    Selection criteria:
+    - Prefer responses with code examples (look for code blocks with ```)
+    - Prefer responses with explanations (containing words like "because" or "reason")
+    - Prefer responses with examples or concrete instances
+    - Prefer responses with clear structure (multiple headings with # symbols)
+    - Longer responses may be more comprehensive, but quality over quantity
+
+    Output only the selected response without any introduction or explanation about your selection process.
+    """,
+    model="gemini-2.0-flash"  # Using Gemini for selection as it's fast and efficient
+)
+
+# Sequential workflow: first run models in parallel, then select best response
+multi_agent = SequentialAgent(
     name="BAID_multi_model_agent",
     description="Development assistant using multiple AI models to provide the best coding advice",
-    agents={"gemini": gemini_agent, "claude": claude_agent},
-    selector=select_best_response
+    sub_agents=[parallel_execution, selector_agent]
 )
 
 # Required variable for ADK CLI
