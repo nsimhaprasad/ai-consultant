@@ -26,3 +26,21 @@ variable "cloud_run_service_name" {
   type        = string
   default     = "ai-consultant-backend"
 }
+
+variable "website_artifact_repo_name" {
+  description = "Name of Artifact Registry repo for website"
+  type        = string
+  default     = "website-frontend-repo"
+}
+
+variable "website_cloud_run_service_name" {
+  description = "Cloud Run service name for website frontend"
+  type        = string
+  default     = "website-frontend"
+}
+
+variable "website_image" {
+  description = "Docker image for website frontend"
+  type        = string
+  default     = "gcr.io/ai-consultant-458311/website-frontend:latest"
+}
