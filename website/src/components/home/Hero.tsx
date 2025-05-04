@@ -23,8 +23,8 @@ const Hero: React.FC = () => {
           >
             <div className="mb-6">
               <span className="badge badge-primary mb-4">Intelligent Coding Assistant</span>
-              <h1 className="mb-6">
-                <span className="gradient-text font-bold">Realize Your Ideas</span>
+              <h1 className="mb-6 title">
+                <span className="gradient-text">Realize Your Ideas</span>
                 <br />
                 With Clean Code
               </h1>

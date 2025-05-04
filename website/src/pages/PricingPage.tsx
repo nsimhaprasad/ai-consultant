@@ -133,8 +133,8 @@ const PricingPage: React.FC = () => {
             className="max-w-2xl mx-auto"
           >
             <span className="badge badge-primary mb-4">Pricing</span>
-            <h1 className="mb-6">
-              <span className="gradient-text font-bold">Simple, Transparent Pricing</span>
+            <h1 className="mb-6 title">
+              <span className="gradient-text">Simple, Transparent Pricing</span>
             </h1>
             <p className="text-lg md:text-xl text-surface-300 mb-8">
               Choose the plan that best fits your needs. All plans include core Baid.dev features

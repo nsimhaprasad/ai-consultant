@@ -39,8 +39,8 @@ const HostedPage: React.FC = () => {
             >
               <div className="mb-6">
                 <span className="badge badge-primary mb-4">Hosted Solution</span>
-                <h1 className="mb-6">
-                  <span className="gradient-text font-bold">Write Better Code</span>
+                <h1 className="mb-6 title">
+                  <span className="gradient-text">Write Better Code</span>
                   <br />
                   Without the Setup Hassle
                 </h1>

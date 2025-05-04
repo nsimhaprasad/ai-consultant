@@ -39,8 +39,8 @@ const OnPremisePage: React.FC = () => {
             >
               <div className="mb-6">
                 <span className="badge badge-primary mb-4">On-Premise Solution</span>
-                <h1 className="mb-6">
-                  <span className="gradient-text font-bold">Complete Control</span>
+                <h1 className="mb-6 title">
+                  <span className="gradient-text">Complete Control</span>
                   <br />
                   Over Your Environment
                 </h1>

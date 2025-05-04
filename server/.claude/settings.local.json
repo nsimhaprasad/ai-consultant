@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/unit/test_code_chunker.py -v)",
+      "Bash(python -m pytest tests/unit/test_code_chunker.py -v)",
+      "Bash(poetry run python -m pytest:*)",
+      "Bash(poetry run python -m pytest:*)",
+      "Bash(poetry update:*)",
+      "Bash(poetry update:*)",
+      "Bash(poetry install:*)",
+      "Bash(poetry install:*)",
+      "Bash(poetry remove:*)",
+      "Bash(poetry add:*)",
+      "Bash(poetry remove:*)",
+      "Bash(poetry add:*)",
+      "Bash(ls:*)",
+      "Bash(ls:*)",
+      "Bash(poetry run pip show:*)",
+      "Bash(poetry run pip show:*)",
+      "Bash(chmod:*)",
+      "Bash(poetry run:*)",
+      "Bash(chmod:*)",
+      "Bash(poetry run:*)",
+      "Bash(python3:*)",
+      "Bash(python3:*)"
+    ],
+    "deny": []
+  }
+}

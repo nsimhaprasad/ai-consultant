@@ -69,6 +69,10 @@
     @apply bg-surface-900 rounded-xl p-6 border border-surface-800;
   }
 
+  .title {
+    @apply font-['Inter'] font-black;
+  }
+
   .gradient-text {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-secondary-400;
   }
