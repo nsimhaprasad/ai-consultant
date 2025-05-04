@@ -9,7 +9,7 @@ interface WaitlistFormProps {
 
 const WaitlistForm: React.FC<WaitlistFormProps> = ({ 
   title = "Join the Waitlist",
-  subtitle = "Be the first to know when we launch our hosted solution."
+  subtitle = "Be the first to get access to our agent."
 }) => {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');

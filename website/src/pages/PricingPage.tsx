@@ -5,7 +5,7 @@ import PricingCard from '../components/pricing/PricingCard';
 
 const PricingPage: React.FC = () => {
   useEffect(() => {
-    document.title = 'Pricing - <b>baid';
+    document.title = 'Pricing - baid';
   }, []);
 
   const [headerRef, headerInView] = useInView({
@@ -27,16 +27,14 @@ const PricingPage: React.FC = () => {
   const pricingTiers = [
     {
       name: "Starter",
-      description: "Perfect for individual developers and small projects",
-      price: "$49",
+      description: "Perfect for developers using agents occasionally",
+      price: "$8",
       priceDetails: "/month",
       features: [
         { text: "AI code assistance", included: true },
         { text: "Basic debugging help", included: true },
         { text: "Standard refactoring suggestions", included: true },
         { text: "Single IDE integration", included: true },
-        { text: "5 GB code analysis/month", included: true },
-        { text: "Email support", included: true },
         { text: "Advanced security analysis", included: false },
         { text: "Team collaboration features", included: false },
         { text: "Custom model training", included: false },
@@ -48,15 +46,13 @@ const PricingPage: React.FC = () => {
     {
       name: "Pro",
       description: "Ideal for professional developers and growing teams",
-      price: "$129",
+      price: "$15",
       priceDetails: "/month",
       features: [
         { text: "AI code assistance", included: true },
         { text: "Advanced debugging", included: true },
         { text: "Advanced refactoring suggestions", included: true },
         { text: "Multiple IDE integrations", included: true },
-        { text: "25 GB code analysis/month", included: true },
-        { text: "Priority email & chat support", included: true },
         { text: "Basic security analysis", included: true },
         { text: "Team collaboration features", included: true },
         { text: "Custom model training", included: false },

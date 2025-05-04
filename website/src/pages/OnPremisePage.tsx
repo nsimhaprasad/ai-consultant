@@ -7,7 +7,7 @@ import OnPremiseFeatures from '../components/onpremise/OnPremiseFeatures';
 
 const OnPremisePage: React.FC = () => {
   useEffect(() => {
-    document.title = 'On-Premise Solution - <b>baid';
+    document.title = 'On-Premise Solution - baid';
   }, []);
 
   const [topRef, topInView] = useInView({

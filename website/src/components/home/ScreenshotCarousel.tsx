@@ -6,22 +6,22 @@ const screenshots = [
   {
     id: 1,
     title: 'Terminal Debugging',
-    description: 'Java failure debugging with LLM assistance',
-    imageUrl: 'https://images.pexels.com/photos/11035471/pexels-photo-11035471.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
+    description: 'Failure debugging with LLM assistance',
+    imageUrl: '/images/terminal.png',
     alt: 'Terminal showing Java debugging session with AI assistance'
   },
   {
     id: 2,
     title: 'VSCode Integration',
-    description: 'Code refactoring suggestions based on SOLID principles',
-    imageUrl: 'https://images.pexels.com/photos/11035380/pexels-photo-11035380.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
+    description: 'Code refactoring suggestions based on clean code principles',
+    imageUrl: '/images/vscode.png',
     alt: 'VSCode with code refactoring suggestions from AI'
   },
   {
     id: 3,
     title: 'IntelliJ Integration',
     description: 'Intelligent code reviews in your IDE',
-    imageUrl: 'https://images.pexels.com/photos/5926382/pexels-photo-5926382.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
+    imageUrl: '/images/intellij.png',
     alt: 'IntelliJ IDEA with AI code review comments'
   }
 ];

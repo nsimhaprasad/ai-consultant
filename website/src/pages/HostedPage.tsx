@@ -37,25 +37,28 @@ const HostedPage: React.FC = () => {
               animate={topInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{ duration: 0.6 }}
             >
-              <div className="mb-6">
-                <span className="badge badge-primary mb-4">Hosted Solution</span>
-                <h1 className="mb-6 title">
+              <div className="mb-8">
+                <span className="badge badge-primary mb-8">Hosted Solution</span>
+                <h1 className="mb-8 title">
                   <span className="gradient-text">Write Better Code</span>
                   <br />
                   Without the Setup Hassle
                 </h1>
-                <p className="text-lg md:text-xl text-surface-300 mb-8 max-w-lg">
-                  Our fully managed cloud solution gives you all the power of <b>baid</b>
+                <p className="text-lg md:text-xl text-surface-300 mb-8 max-w-lg md:leading-loose">
+                  Our fully managed cloud solution gives you all the power of <b>baid </b>
                   with zero infrastructure maintenance, automatic updates, and immediate
                   availability.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/pricing" className="btn btn-primary">
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => window.location.href = '/pricing'}
+                >
                   View Pricing
                   <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
+                </button>
               </div>
             </motion.div>
 
@@ -186,13 +189,13 @@ const HostedPage: React.FC = () => {
             </div>
             
             <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link 
-                to="/pricing" 
+              <button 
                 className="btn btn-primary"
+                onClick={() => window.location.href = '/pricing'}
               >
                 View Pricing Options
                 <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
+              </button>
               <Link 
                 to="/on-premise" 
                 className="btn btn-outline"
