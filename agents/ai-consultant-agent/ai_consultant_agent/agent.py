@@ -2,7 +2,6 @@ import os
 import json
 import logging
 from google.adk import Agent, MultiAgentExecutor
-from google.adk.models.lite_llm import LiteLlm
 from typing import List, Optional
 
 # Configure logging
@@ -123,12 +122,12 @@ gemini_agent = Agent(
     tools=[suggest_development_approach, refactor_code, generate_tests],
 )
 
-# Claude agent
+# Claude agent - using direct Vertex AI endpoint string
 claude_agent = Agent(
     name='BAID_claude_agent',
     description='BESKAR.TECH development assistant that helps write code, refactor, create tests, and follow principles like TDD and SOLID.',
     instruction='Help developers write clean, maintainable code following best practices in software development. Provide guidance on testing, refactoring, and implementing design principles.',
-    model=LiteLlm(model="vertex/claude-3-7-sonnet@20250219"),
+    model="publishers/anthropic/models/claude-3-7-sonnet@20250219",  # Direct Vertex AI model reference
     tools=[suggest_development_approach, refactor_code, generate_tests],
 )
 
