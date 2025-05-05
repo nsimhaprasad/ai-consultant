@@ -41,13 +41,12 @@ resource "google_cloud_run_service" "default" {
           timeout_seconds = 3
           period_seconds = 5
           failure_threshold = 10
-          success_threshold = 1
         }
 
         resources {
           limits = {
             memory = "512Mi"
-            cpu    = "0.50"
+            cpu    = "1000m"  # Changed to 1 CPU (1000m) to support higher concurrency
           }
         }
 
@@ -59,7 +58,7 @@ resource "google_cloud_run_service" "default" {
       }
       service_account_name = google_service_account.cloud_run.email
 
-      # Set container concurrency for better scaling
+      # Set container concurrency for better scaling - compatible with CPU setting
       container_concurrency = 80
       timeout_seconds = 300
     }
@@ -199,19 +198,18 @@ resource "google_cloud_run_service" "website" {
           timeout_seconds = 3
           period_seconds = 5
           failure_threshold = 10
-          success_threshold = 1
         }
 
         resources {
           limits = {
             memory = "256Mi"
-            cpu    = "0.25"
+            cpu    = "1000m"  # Changed to 1 CPU (1000m) to support higher concurrency
           }
         }
       }
       service_account_name = google_service_account.website_cloud_run.email
 
-      # Set container concurrency for better scaling
+      # Set container concurrency for better scaling - compatible with CPU setting
       container_concurrency = 80
       timeout_seconds = 300
     }
