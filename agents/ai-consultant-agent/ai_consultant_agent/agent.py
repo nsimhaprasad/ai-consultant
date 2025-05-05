@@ -1,14 +1,19 @@
 import os
 import json
 import logging
-from google.adk import Agent
-from google.adk.agents import ParallelAgent, SequentialAgent
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, AsyncGenerator
+from google.adk import Agent as GeminiAgent
+from google.adk.agents import LlmAgent, ParallelAgent, SequentialAgent
+from google.adk.agents.invocation_context import InvocationContext
+from google.adk.events import Event
+from google.genai import types
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Model configurations
+GEMINI_MODEL = "gemini-2.0-flash"
 
 # --- Software Development Tools ---
 def get_development_principles() -> str:
@@ -23,7 +28,7 @@ def get_development_principles() -> str:
     return "\n".join(principles)
 
 
-async def suggest_development_approach(project_description: str) -> str:
+def suggest_development_approach(project_description: str) -> str:
     """Tool function that suggests the best development approach(es) for a project."""
     principles_list = get_development_principles()
     return f"""
@@ -37,7 +42,7 @@ async def suggest_development_approach(project_description: str) -> str:
     """
 
 
-async def refactor_code(code_snippet: str, target_principle: Optional[str] = None) -> str:
+def refactor_code(code_snippet: str, target_principle: Optional[str] = None) -> str:
     """Tool function that suggests refactoring improvements for provided code."""
     return f"""
     Analyze the following code:
@@ -51,7 +56,7 @@ async def refactor_code(code_snippet: str, target_principle: Optional[str] = Non
     """
 
 
-async def generate_tests(code_snippet: str, test_framework: Optional[str] = None) -> str:
+def generate_tests(code_snippet: str, test_framework: Optional[str] = None) -> str:
     """Tool function that generates test cases for provided code."""
     return f"""
     Analyze the following code:
@@ -67,59 +72,42 @@ async def generate_tests(code_snippet: str, test_framework: Optional[str] = None
     """
 
 
-# --- Individual Agents ---
-# Gemini agent
-gemini_agent = Agent(
-    name='BAID_gemini_agent',
-    description='BESKAR.TECH development assistant that helps write code, refactor, create tests, and follow principles like TDD and SOLID.',
-    instruction='Help developers write clean, maintainable code following best practices in software development. Provide guidance on testing, refactoring, and implementing design principles.',
-    model="gemini-2.0-flash",
-    tools=[suggest_development_approach, refactor_code, generate_tests],
-    output_key="gemini_response"  # Store result in session state
+def generate_code(language: str, description: str = "A simple program") -> str:
+    """Tool function that generates code in the specified programming language."""
+    return f"""
+    Generate clean, well-documented code in {language} for:
+
+    {description}
+
+    Follow best practices for {language}, including:
+    - Proper naming conventions
+    - Good documentation/comments
+    - Appropriate error handling
+    - Modular design
+
+    Provide a complete, working example with explanations of key components.
+    """
+from google.adk.models.anthropic_llm import Claude # Import needed for registration
+from google.adk.models.registry import LLMRegistry # Import needed for registration
+LLMRegistry.register(Claude)
+
+# --- Gemini Agent Implementation (single model version) ---
+root_agent = GeminiAgent(
+    name='gemini_agent',
+    description='BESKAR.TECH development assistant using Gemini',
+    instruction='''
+    Help developers write clean, maintainable code following best practices in software development. 
+    Provide guidance on testing, refactoring, and implementing design principles.
+
+    When asked to generate code, always provide a complete, working example with explanations.
+    If asked for a specific language like Java, Python, etc., generate code in that language.
+
+    Always respond with detailed, helpful answers even for simple requests.
+    Never return empty or minimal responses.
+
+    For "Generate sample Java code" requests, create a complete working Java example 
+    with proper class structure, including a main method, comments, and standard Java conventions.
+    ''',
+    model='claude-3-5-sonnet-v2@20241022',
+    tools=[suggest_development_approach, refactor_code, generate_tests, generate_code]
 )
-
-# Claude agent - using direct Vertex AI endpoint string
-claude_agent = Agent(
-    name='BAID_claude_agent',
-    description='BESKAR.TECH development assistant that helps write code, refactor, create tests, and follow principles like TDD and SOLID.',
-    instruction='Help developers write clean, maintainable code following best practices in software development. Provide guidance on testing, refactoring, and implementing design principles.',
-    model="claude-3-7-sonnet@20250219",  # Using the shortened version that works in your environment
-    tools=[suggest_development_approach, refactor_code, generate_tests],
-    output_key="claude_response"  # Store result in session state
-)
-
-# Parallel execution of both models
-parallel_execution = ParallelAgent(
-    name="parallel_model_exec",
-    sub_agents=[gemini_agent, claude_agent]
-)
-
-# Response selector agent - will choose the best response
-selector_agent = Agent(
-    name="response_selector",
-    description="Selects the best response from multiple model outputs",
-    instruction="""
-    Compare the responses stored in state keys 'gemini_response' and 'claude_response'.
-    Select the response that is most comprehensive, well-explained, and helpful.
-
-    Selection criteria:
-    - Prefer responses with code examples (look for code blocks with ```)
-    - Prefer responses with explanations (containing words like "because" or "reason")
-    - Prefer responses with examples or concrete instances
-    - Prefer responses with clear structure (multiple headings with # symbols)
-    - Longer responses may be more comprehensive, but quality over quantity
-
-    Output only the selected response without any introduction or explanation about your selection process.
-    """,
-    model="gemini-2.0-flash"  # Using Gemini for selection as it's fast and efficient
-)
-
-# Sequential workflow: first run models in parallel, then select best response
-multi_agent = SequentialAgent(
-    name="BAID_multi_model_agent",
-    description="Development assistant using multiple AI models to provide the best coding advice",
-    sub_agents=[parallel_execution, selector_agent]
-)
-
-# Required variable for ADK CLI
-root_agent = multi_agent
