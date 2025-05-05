@@ -92,7 +92,7 @@ jobs:
           GCP_BUCKET: ${{ vars.GCP_BUCKET }}
         run: |
           cd agents/ai-consultant-agent/deployment
-          python delete_agents_auto.py --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET
+          python delete_agents_auto.py --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET --force
 
       - name: Report cleanup status
         if: steps.check_signal.outputs.signal_found == 'true'
