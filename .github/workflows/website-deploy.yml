@@ -13,7 +13,7 @@ jobs:
     environment: production
     env:
       PROJECT_ID: ai-consultant-458311
-      REGION: asia-south1
+      REGION: us-central1
       REPO_NAME: website-frontend-repo
       SERVICE_NAME: website-frontend
 #    env:

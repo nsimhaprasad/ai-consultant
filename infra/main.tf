@@ -74,6 +74,7 @@ resource "google_project_iam_member" "storage_admin" {
 resource "google_storage_bucket" "staging" {
   name     = var.bucket_name
   location = var.region
+  force_destroy = true
 }
 
 resource "google_project_service" "vertex_ai" {
