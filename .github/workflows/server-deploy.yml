@@ -171,6 +171,7 @@ jobs:
       REGION: us-central1
       REPO_NAME: ai-consultant-backend-repo
       SERVICE_NAME: ai-consultant-backend
+      VERSION: "1.0.0-$(date +%Y%m%d%H%M%S)"
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -209,9 +210,16 @@ jobs:
           cat ./server/agents/ai-consultant-agent/deployment/agent_resource.txt
           echo "=================================================="
 
+      # No need to manually add health check endpoint since it's already in main.py
+      # Create version file to track deployed version
+      - name: Add version information
+        run: |
+          echo "VERSION=${{ env.VERSION }}" > ./server/.env.version
+          echo "Deployment version: ${{ env.VERSION }}"
+
       - name: Build Docker image
         run: |
-          docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} ./server
+          docker build --build-arg VERSION=${{ env.VERSION }} -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} ./server
 
       - name: Push Docker image
         run: |
@@ -231,6 +239,7 @@ jobs:
           fi
           echo "=============================================="
 
+      # Deploy with zero-downtime configuration
       - name: Deploy to Cloud Run
         run: |
           AGENT_PATH=$(cat ./server/agents/ai-consultant-agent/deployment/agent_resource.txt)
@@ -244,9 +253,11 @@ jobs:
             "PROJECT_ID=${{ vars.PROJECT_ID }}"
             "GOOGLE_REDIRECT_URI=${{ vars.BAID_REDIRECT_URI }}"
             "ENABLE_WORD_BY_WORD_STREAMING=true"
+            "VERSION=${{ env.VERSION }}"
           )
           ENV_VARS_STRING=$(IFS=,; echo "${ENV_VARS[*]}")
           
+          # Deploy with traffic splitting for zero-downtime
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             --region=${{ env.REGION }} \
@@ -255,7 +266,90 @@ jobs:
             --memory=512Mi \
             --cpu=0.50 \
             --port=8080 \
-            --set-env-vars="$ENV_VARS_STRING"
+            --min-instances=1 \
+            --max-instances=10 \
+            --concurrency=80 \
+            --set-env-vars="$ENV_VARS_STRING" \
+            --no-traffic
+
+      # Check if the new revision is healthy before shifting traffic
+      - name: Wait for new revision to be ready
+        run: |
+          # Get the latest revision
+          LATEST_REVISION=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format="value(status.latestCreatedRevisionName)")
+          echo "Latest revision: $LATEST_REVISION"
+          
+          # Wait for the revision to be ready
+          echo "Waiting for revision to be ready..."
+          for i in {1..30}; do
+            STATUS=$(gcloud run revisions describe $LATEST_REVISION --region=${{ env.REGION }} --format="value(status.conditions[0].status)")
+            if [[ "$STATUS" == "True" ]]; then
+              echo "Revision is ready!"
+              break
+            fi
+            echo "Waiting for revision to be ready... Attempt $i/30"
+            sleep 10
+          done
+          
+          if [[ "$STATUS" != "True" ]]; then
+            echo "::error::Revision failed to become ready after 5 minutes"
+            exit 1
+          fi
+          
+          # Explicitly check health endpoint
+          echo "Checking health endpoint..."
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format="value(status.url)")
+          HEALTH_URL="${SERVICE_URL}/health"
+          
+          # Use curl with the latest revision URL
+          REVISION_URL="${SERVICE_URL}?revision=${LATEST_REVISION}"
+          HEALTH_REVISION_URL="${REVISION_URL}/health"
+          
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "${HEALTH_REVISION_URL}" || echo "failed")
+          echo "Health endpoint response: $RESPONSE"
+          
+          if [[ "$RESPONSE" != "200" ]]; then
+            echo "::error::Health check failed with response code: $RESPONSE"
+            exit 1
+          fi
+          
+          echo "Health check passed successfully!"
+
+      # Gradually shift traffic to the new revision
+      - name: Shift traffic to new revision
+        run: |
+          LATEST_REVISION=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format="value(status.latestCreatedRevisionName)")
+          PREVIOUS_REVISION=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format="value(status.traffic[0].revisionName)")
+          
+          if [[ "$LATEST_REVISION" != "$PREVIOUS_REVISION" ]]; then
+            echo "Beginning gradual traffic migration..."
+            
+            # First shift 20% traffic to the new revision
+            echo "Shifting 20% traffic to new revision: $LATEST_REVISION"
+            gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+              --region=${{ env.REGION }} \
+              --to-revisions="${LATEST_REVISION}=20,${PREVIOUS_REVISION}=80"
+            
+            # Wait to ensure stability
+            sleep 20
+            
+            # Then shift 50% traffic
+            echo "Shifting 50% traffic to new revision: $LATEST_REVISION"
+            gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+              --region=${{ env.REGION }} \
+              --to-revisions="${LATEST_REVISION}=50,${PREVIOUS_REVISION}=50"
+            
+            # Wait to ensure stability
+            sleep 20
+            
+            # Finally shift 100% traffic
+            echo "Shifting 100% traffic to new revision: $LATEST_REVISION"
+            gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+              --region=${{ env.REGION }} \
+              --to-revisions="${LATEST_REVISION}=100"
+          else
+            echo "Latest revision is the same as current revision. Skipping traffic migration."
+          fi
 
       # Create a completion signal artifact
       - name: Signal server deployment completion

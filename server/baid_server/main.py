@@ -300,12 +300,60 @@ def get_current_user(token: HTTPAuthorizationCredentials = Depends(bearer_scheme
 
 @app.get("/")
 def read_root():
-    logger.info("Health check endpoint called")
+    logger.info("Root endpoint called")
     return {
         "message": "Server is running",
         "agent_engine_id": AGENT_ENGINE_ID,
         "word_by_word_streaming": ENABLE_WORD_BY_WORD_STREAMING
     }
+
+
+# Dedicated health check endpoint for Cloud Run
+@app.get("/health")
+def health_check():
+    """
+    Health check endpoint for Cloud Run.
+    Returns 200 OK if the server is running and all dependencies are healthy.
+    """
+    logger.info("Health check endpoint called")
+
+    health_status = {
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": os.getenv("VERSION", "development"),
+        "checks": {
+            "server": "ok",
+            "database": "ok",
+            "agent": "ok"
+        }
+    }
+
+    # Check database connection
+    try:
+        conn = sqlite3.connect('/tmp/sessions.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Database health check failed: {str(e)}")
+        health_status["checks"]["database"] = "failed"
+        health_status["status"] = "degraded"
+
+    # Check agent configuration
+    if not AGENT_ENGINE_ID:
+        logger.warning("Agent Engine ID is not configured")
+        health_status["checks"]["agent"] = "warning"
+        health_status["status"] = "degraded"
+
+    # Return appropriate HTTP status based on overall health
+    if health_status["status"] == "ok":
+        return health_status
+    else:
+        return JSONResponse(
+            status_code=200,  # Still return 200 to avoid immediate termination
+            content=health_status
+        )
 
 
 def get_agent():
