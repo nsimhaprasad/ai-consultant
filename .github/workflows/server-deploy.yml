@@ -264,7 +264,7 @@ jobs:
             --platform=managed \
             --allow-unauthenticated \
             --memory=512Mi \
-            --cpu=0.50 \
+            --cpu=1.00 \
             --port=8080 \
             --min-instances=1 \
             --max-instances=10 \
