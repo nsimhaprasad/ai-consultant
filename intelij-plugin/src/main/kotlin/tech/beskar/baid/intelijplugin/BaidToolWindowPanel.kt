@@ -14,70 +14,22 @@ import com.vladsch.flexmark.html.HtmlRenderer
 import com.vladsch.flexmark.parser.Parser
 import com.vladsch.flexmark.util.ast.Node
 import com.vladsch.flexmark.util.data.MutableDataSet
-import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
-import org.fife.ui.rsyntaxtextarea.SyntaxConstants
-import org.fife.ui.rtextarea.RTextScrollPane
+import tech.beskar.baid.intelijplugin.ui.MessageFormatter
 import org.json.JSONArray
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
 import tech.beskar.baid.intelijplugin.auth.LoginPanel
 import tech.beskar.baid.intelijplugin.config.BaidConfiguration
 import tech.beskar.baid.intelijplugin.util.FontUtil
+import tech.beskar.baid.intelijplugin.util.getMessageWidth
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
 
 class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindowPanel>(BorderLayout()) {
-    // HTML styling for message content - base style without width (added dynamically)
+    // No need for HTML and CSS constants as they're now in MessageFormatter
     private val HTML_WRAPPER_STYLE = "word-wrap: break-word; margin: 0; padding: 0; overflow-wrap: break-word;"
-
-    // CSS for code blocks
-    private val CODE_BLOCK_STYLE = """
-        .code-container {
-            position: relative;
-            margin: 8px 0;
-        }
-        .code-block {
-            background-color: #000000;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: monospace;
-            padding: 8px;
-            padding-top: 12px;
-            margin-top: 20px;
-            overflow-x: auto;
-        }
-        .code-block pre {
-            margin: 0;
-            white-space: pre-wrap;
-        }
-        .copy-button {
-            position: absolute;
-            top: 0;
-            right: 0;
-            background-color: #e0e0e0;
-            border: none;
-            border-radius: 3px;
-            padding: 3px 6px;
-            font-size: 12px;
-            cursor: pointer;
-            z-index: 10;
-        }
-        .copy-button:hover {
-            background-color: #d0d0d0;
-        }
-    """.trimIndent()
-
-    // Calculate dynamic message width based on chat panel width
-    private fun getMessageWidth(): Int {
-        val panelWidth = chatPanel.width
-        if (panelWidth <= 0) return JBUI.scale(280) // Default if panel not yet sized
-
-        // Use 60% of panel width for better fit, with min and max constraints
-        val dynamicWidth = (panelWidth * 0.6).toInt()
-        return dynamicWidth.coerceAtLeast(JBUI.scale(200)).coerceAtMost(JBUI.scale(300))
-    }
 
     // Update all message bubbles when window is resized
     private fun updateAllMessageWidths() {
@@ -877,34 +829,10 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         // Create message text area
         val messageText = JTextPane().apply {
             contentType = "text/html"
+            // Use MessageFormatter to process the message and extract code blocks
             val messageWidth = getMessageWidth()
-            // Extract code blocks for separate handling with RSyntaxTextArea
-            val codeBlockPattern = "```(?:([a-zA-Z0-9]+)\\s+)?([\\s\\S]*?)```".toRegex()
-            val codeBlocks = mutableListOf<Triple<String, String, String>>()
-            var codeBlockCounter = 0
-            
-            // Replace code blocks with placeholders
-            var processedMessage = message.replace(codeBlockPattern) { matchResult ->
-                val language = matchResult.groupValues[1] // Language identifier
-                val codeContent = matchResult.groupValues[2].trim()
-                val placeholder = "CODE_BLOCK_PLACEHOLDER_${codeBlockCounter++}"
-                codeBlocks.add(Triple(placeholder, language, codeContent))
-                placeholder
-            }
-
-            // Then process line breaks and asterisks
-            processedMessage = processedMessage.replace("\n", "<br>")
-                .replace("*", "<br>") // Single asterisk becomes a line break
-
-            // Set basic HTML content without code blocks
-            text = """<html>
-                <head>
-                    <style>
-                        body {$HTML_WRAPPER_STYLE width: ${messageWidth}px; max-width: ${messageWidth}px;}
-                    </style>
-                </head>
-                <body>$processedMessage</body>
-            </html>""".trimIndent()
+            val (htmlContent, codeBlocks) = MessageFormatter.processMessage(message, messageWidth)
+            text = htmlContent
             font = FontUtil.getBodyFont()
             isEditable = false
             isOpaque = false
@@ -1212,113 +1140,24 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         )
     }
 
-    // Helper method to update message panel with streaming text
-    // Helper method to create a syntax highlighted code block component
-    private fun createCodeBlock(code: String, language: String): JComponent {
-        val textArea = RSyntaxTextArea(code).apply {
-            syntaxEditingStyle = getSyntaxStyle(language)
-            isEditable = false
-            isCodeFoldingEnabled = true
-            antiAliasingEnabled = true
-            background = JBColor(Color(40, 44, 52), Color(40, 44, 52)) // Dark background
-            foreground = JBColor(Color(171, 178, 191), Color(171, 178, 191)) // Light text
-            caretColor = JBColor(Color(171, 178, 191), Color(171, 178, 191))
-            currentLineHighlightColor = JBColor(Color(44, 49, 58), Color(44, 49, 58))
-            font = Font(Font.MONOSPACED, Font.PLAIN, 13)
-            tabSize = 4
-            paintTabLines = true
-            marginLinePosition = 80
-            border = JBUI.Borders.empty(8)
-        }
-
-        val scrollPane = RTextScrollPane(textArea).apply {
-            border = JBUI.Borders.empty()
-            lineNumbersEnabled = true
-            viewportBorder = JBUI.Borders.empty()
-            horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
-            verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED
-        }
-
-        // Create a container with copy button
-        val container = JPanel(BorderLayout()).apply {
-            border = BorderFactory.createLineBorder(JBColor.border(), 1)
-            background = JBColor(Color(40, 44, 52), Color(40, 44, 52))
-        }
-        container.add(scrollPane, BorderLayout.CENTER)
-        
-        val copyButton = JButton("Copy").apply {
-            addActionListener {
-                textArea.selectAll()
-                textArea.copy()
-                textArea.select(0, 0)
-            }
-            background = JBColor(Color(97, 175, 239), Color(97, 175, 239))
-            foreground = JBColor.BLACK
-            border = BorderFactory.createEmptyBorder(3, 8, 3, 8)
-            cursor = Cursor(Cursor.HAND_CURSOR)
-        }
-        
-        val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT)).apply {
-            background = JBColor(Color(40, 44, 52), Color(40, 44, 52))
-            add(copyButton)
-        }
-        container.add(buttonPanel, BorderLayout.NORTH)
-        
-        return container
-    }
-    
-    // Helper method to determine syntax style based on language
-    private fun getSyntaxStyle(language: String): String {
-        return when (language.lowercase()) {
-            "java" -> SyntaxConstants.SYNTAX_STYLE_JAVA
-            "kotlin" -> SyntaxConstants.SYNTAX_STYLE_KOTLIN
-            "python" -> SyntaxConstants.SYNTAX_STYLE_PYTHON
-            "javascript", "js" -> SyntaxConstants.SYNTAX_STYLE_JAVASCRIPT
-            "typescript", "ts" -> SyntaxConstants.SYNTAX_STYLE_TYPESCRIPT
-            "html" -> SyntaxConstants.SYNTAX_STYLE_HTML
-            "xml" -> SyntaxConstants.SYNTAX_STYLE_XML
-            "css" -> SyntaxConstants.SYNTAX_STYLE_CSS
-            "json" -> SyntaxConstants.SYNTAX_STYLE_JSON
-            "sql" -> SyntaxConstants.SYNTAX_STYLE_SQL
-            "bash", "sh" -> SyntaxConstants.SYNTAX_STYLE_UNIX_SHELL
-            "c" -> SyntaxConstants.SYNTAX_STYLE_C
-            "cpp", "c++" -> SyntaxConstants.SYNTAX_STYLE_CPLUSPLUS
-            "csharp", "c#" -> SyntaxConstants.SYNTAX_STYLE_CSHARP
-            "go" -> SyntaxConstants.SYNTAX_STYLE_GO
-            "php" -> SyntaxConstants.SYNTAX_STYLE_PHP
-            "ruby" -> SyntaxConstants.SYNTAX_STYLE_RUBY
-            "scala" -> SyntaxConstants.SYNTAX_STYLE_SCALA
-            "yaml" -> SyntaxConstants.SYNTAX_STYLE_YAML
-            else -> SyntaxConstants.SYNTAX_STYLE_NONE
-        }
-    }
 
     private fun updateMessagePanel(messagePanel: JBPanel<*>, text: String) {
         val options = MutableDataSet()
         val parser = Parser.builder(options).build()
         val htmlrenderer = HtmlRenderer.builder(options).build()
 
-        // Extract code blocks for separate handling with RSyntaxTextArea
-        val codeBlockPattern = "```(?:([a-zA-Z0-9]+)\\s+)?([\\s\\S]*?)```".toRegex()
-        val codeBlocks = mutableListOf<Triple<String, String, String>>()
-        var codeBlockCounter = 0
+        // Use MessageFormatter to process the message and extract code blocks
+        val messageWidth = getMessageWidth()
+        val (wrappedHtml, codeBlocks) = MessageFormatter.processMessage(text, messageWidth)
         
-        // Replace code blocks with placeholders
-        var processedText = text.replace(codeBlockPattern) { matchResult ->
-            val language = matchResult.groupValues[1] // Language identifier
-            val codeContent = matchResult.groupValues[2].trim()
-            val placeholder = "CODE_BLOCK_PLACEHOLDER_${codeBlockCounter++}"
-            codeBlocks.add(Triple(placeholder, language, codeContent))
-            placeholder
+        // Extract the HTML body content from the wrapped HTML
+        val bodyStartIndex = wrappedHtml.indexOf("<body>") + 6
+        val bodyEndIndex = wrappedHtml.indexOf("</body>")
+        var html = if (bodyStartIndex > 5 && bodyEndIndex > bodyStartIndex) {
+            wrappedHtml.substring(bodyStartIndex, bodyEndIndex)
+        } else {
+            wrappedHtml
         }
-
-        // Then process line breaks and asterisks
-        processedText = processedText.replace("\n", "<br>")
-            .replace("*", "<br>") // Single asterisk becomes a line break
-
-        // Parse and render the processed text
-        val document: Node = parser.parse(processedText)
-        val html: String? = htmlrenderer.render(document)
 
         SwingUtilities.invokeLater {
             try {
@@ -1342,6 +1181,38 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                     border = JBUI.Borders.empty()
                 }
                 val messageWidth = getMessageWidth()
+                
+                // If there are code blocks, process them before setting the HTML
+                if (codeBlocks.isNotEmpty()) {
+                    val codeBlocksPanel = JBPanel<JBPanel<*>>(VerticalLayout(8))
+                    codeBlocksPanel.isOpaque = false
+                    
+                    // Create all code block components
+                    val codeComponentMap = mutableMapOf<String, JComponent>()
+                    for ((placeholder, language, code) in codeBlocks) {
+                        // Create a syntax highlighted code block for each code block
+                        val codeBlockComponent = MessageFormatter.createCodeBlock(code, language)
+                        codeComponentMap[placeholder] = codeBlockComponent
+                    }
+                    
+                    // Process all code blocks in the HTML
+                    for ((placeholder, _, _) in codeBlocks) {
+                        // Look for the placeholder wrapper pattern
+                        val wrapperPattern = "<div class='code-placeholder-wrapper' id='${placeholder}'>${placeholder}</div>"
+                        if (html.contains(wrapperPattern)) {
+                            // Add the corresponding code component to the panel
+                            codeComponentMap[placeholder]?.let { codeBlocksPanel.add(it) }
+                            
+                            // Replace the wrapper with an empty string to remove it from the HTML
+                            html = html.replace(wrapperPattern, "")
+                        }
+                    }
+                    
+                    // Add the code blocks panel after setting up all components
+                    messageContentPanel.add(codeBlocksPanel, BorderLayout.CENTER)
+                }
+                
+                // Set the HTML text AFTER processing all placeholders
                 messageText.text = """<html>
                         <head>
                             <style>
@@ -1350,26 +1221,9 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                         </head>
                         <body>$html</body>
                     </html>""".trimIndent()
+                
                 // Add the HTML pane to the content panel
                 messageContentPanel.add(messageText, BorderLayout.NORTH)
-                
-                // If there are code blocks, add them below the HTML content
-                if (codeBlocks.isNotEmpty()) {
-                    val codeBlocksPanel = JBPanel<JBPanel<*>>(VerticalLayout(8))
-                    codeBlocksPanel.isOpaque = false
-                    
-                    // Process each code block
-                    for ((placeholder, language, code) in codeBlocks) {
-                        // Find the placeholder in the HTML content
-                        if (html?.contains(placeholder) == true) {
-                            // Create a syntax highlighted code block
-                            val codeBlockComponent = createCodeBlock(code, language)
-                            codeBlocksPanel.add(codeBlockComponent)
-                        }
-                    }
-                    
-                    messageContentPanel.add(codeBlocksPanel, BorderLayout.CENTER)
-                }
                 
                 // Add the content panel to the bubble container
                 bubbleContainer.add(messageContentPanel, BorderLayout.CENTER)
