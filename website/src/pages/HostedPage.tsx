@@ -28,8 +28,7 @@ const HostedPage: React.FC = () => {
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-primary-900/20 rounded-full blur-[120px] -z-10"></div>
         </div>
-
-        <div className="container-custom">
+        <div className="container-custom relative z-index">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <motion.div
               ref={topRef}
@@ -52,13 +51,10 @@ const HostedPage: React.FC = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4">
-                <button 
-                  className="btn btn-primary" 
-                  onClick={() => window.location.href = '/pricing'}
-                >
+                <Link to="/pricing" className="btn btn-primary">
                   View Pricing
                   <ArrowRight className="ml-2 h-5 w-5" />
-                </button>
+                </Link>
               </div>
             </motion.div>
 
