@@ -37,7 +37,7 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
-REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/auth/google-login")
+REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "https://core.baid.dev/api/auth/google-login")
 
 # DB configuration - from secret manager by default
 DB_CONNECTION_SECRET = os.environ.get("DB_CONNECTION_SECRET", "postgres-connection")

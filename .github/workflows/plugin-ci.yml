@@ -43,7 +43,7 @@ jobs:
         working-directory: intelij-plugin
         env:
           BAID_CLIENT_ID: ${{ secrets.BAID_CLIENT_ID }}
-          BAID_REDIRECT_URI: ${{ secrets.BAID_REDIRECT_URI }}
+          BAID_REDIRECT_URI: ${{ env.BAID_REDIRECT_URI }}
           BAID_AUTH_ENDPOINT: ${{ secrets.BAID_AUTH_ENDPOINT }}
           BAID_SCOPE: ${{ secrets.BAID_SCOPE }}
           BAID_ACCESS_TYPE: ${{ secrets.BAID_ACCESS_TYPE }}
@@ -77,7 +77,7 @@ jobs:
         working-directory: intelij-plugin
         env:
           BAID_CLIENT_ID: ${{ secrets.BAID_CLIENT_ID }}
-          BAID_REDIRECT_URI: ${{ secrets.BAID_REDIRECT_URI }}
+          BAID_REDIRECT_URI: ${{ env.BAID_REDIRECT_URI }}
           BAID_AUTH_ENDPOINT: ${{ secrets.BAID_AUTH_ENDPOINT }}
           BAID_SCOPE: ${{ secrets.BAID_SCOPE }}
           BAID_ACCESS_TYPE: ${{ secrets.BAID_ACCESS_TYPE }}
@@ -105,7 +105,7 @@ jobs:
         working-directory: intelij-plugin
         env:
           BAID_CLIENT_ID: ${{ secrets.BAID_CLIENT_ID }}
-          BAID_REDIRECT_URI: ${{ secrets.BAID_REDIRECT_URI }}
+          BAID_REDIRECT_URI: ${{ env.BAID_REDIRECT_URI }}
           BAID_AUTH_ENDPOINT: ${{ secrets.BAID_AUTH_ENDPOINT }}
           BAID_SCOPE: ${{ secrets.BAID_SCOPE }}
           BAID_ACCESS_TYPE: ${{ secrets.BAID_ACCESS_TYPE }}
