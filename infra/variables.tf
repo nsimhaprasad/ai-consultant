@@ -44,3 +44,9 @@ variable "website_image" {
   type        = string
   default     = "gcr.io/cloudrun/hello"
 }
+
+variable "db_password" {
+  description = "Password for the PostgreSQL database user"
+  type        = string
+  sensitive   = true
+}

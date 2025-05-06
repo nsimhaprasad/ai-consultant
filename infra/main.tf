@@ -27,9 +27,9 @@ resource "google_cloud_run_service" "default" {
             port = 8080
           }
           initial_delay_seconds = 10
-          timeout_seconds = 5
-          period_seconds = 15
-          failure_threshold = 3
+          timeout_seconds       = 5
+          period_seconds        = 15
+          failure_threshold     = 3
         }
 
         startup_probe {
@@ -38,9 +38,9 @@ resource "google_cloud_run_service" "default" {
             port = 8080
           }
           initial_delay_seconds = 5
-          timeout_seconds = 3
-          period_seconds = 5
-          failure_threshold = 10
+          timeout_seconds       = 3
+          period_seconds        = 5
+          failure_threshold     = 10
         }
 
         resources {
@@ -55,12 +55,16 @@ resource "google_cloud_run_service" "default" {
           name  = "VERSION"
           value = "1.0.0"
         }
+        env {
+          name  = "DB_CONNECTION_SECRET"
+          value = google_secret_manager_secret.postgres_connection.name
+        }
       }
       service_account_name = google_service_account.cloud_run.email
 
       # Set container concurrency for better scaling - compatible with CPU setting
       container_concurrency = 80
-      timeout_seconds = 300
+      timeout_seconds       = 300
     }
 
     metadata {
@@ -130,8 +134,8 @@ resource "google_project_iam_member" "storage_admin" {
 }
 
 resource "google_storage_bucket" "staging" {
-  name     = var.bucket_name
-  location = var.region
+  name          = var.bucket_name
+  location      = var.region
   force_destroy = true
 }
 
@@ -184,9 +188,9 @@ resource "google_cloud_run_service" "website" {
             port = 80
           }
           initial_delay_seconds = 10
-          timeout_seconds = 5
-          period_seconds = 15
-          failure_threshold = 3
+          timeout_seconds       = 5
+          period_seconds        = 15
+          failure_threshold     = 3
         }
 
         startup_probe {
@@ -195,9 +199,9 @@ resource "google_cloud_run_service" "website" {
             port = 80
           }
           initial_delay_seconds = 5
-          timeout_seconds = 3
-          period_seconds = 5
-          failure_threshold = 10
+          timeout_seconds       = 3
+          period_seconds        = 5
+          failure_threshold     = 10
         }
 
         resources {
@@ -211,7 +215,7 @@ resource "google_cloud_run_service" "website" {
 
       # Set container concurrency for better scaling - compatible with CPU setting
       container_concurrency = 80
-      timeout_seconds = 300
+      timeout_seconds       = 300
     }
 
     metadata {
@@ -259,4 +263,79 @@ resource "google_cloud_run_service_iam_member" "website_public_invoker" {
   location = var.region
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+# PostgreSQL Instance
+resource "google_sql_database_instance" "postgres" {
+  name             = "ai-consultant-postgres-instance"
+  database_version = "POSTGRES_14"
+  region           = var.region
+
+  settings {
+    tier = "db-f1-micro"  # Smallest instance for development
+
+    backup_configuration {
+      enabled                        = true
+      point_in_time_recovery_enabled = true
+    }
+
+    ip_configuration {
+      ipv4_enabled    = true
+      private_network = null  # You might want to use VPC here in production
+
+      # Allow Cloud Run to connect to this database
+      authorized_networks {
+        name  = "cloud-run"
+        value = "0.0.0.0/0"  # In production, limit this to your specific IP ranges
+      }
+    }
+
+    database_flags {
+      name  = "max_connections"
+      value = "100"
+    }
+  }
+
+  deletion_protection = false  # Set to true for production
+}
+
+# Create the database
+resource "google_sql_database" "database" {
+  name     = "ai_consultant_db"
+  instance = google_sql_database_instance.postgres.name
+}
+
+# Create the user
+resource "google_sql_user" "users" {
+  name     = "baid-dev"
+  instance = google_sql_database_instance.postgres.name
+  password = var.db_password  # Store this in a secret manager in production
+}
+
+# Secret Manager to store database credentials
+resource "google_secret_manager_secret" "postgres_connection" {
+  secret_id = "postgres-connection"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "postgres_connection" {
+  secret      = google_secret_manager_secret.postgres_connection.id
+  secret_data = "postgresql://${google_sql_user.users.name}:${var.db_password}@${google_sql_database_instance.postgres.public_ip_address}:5432/${google_sql_database.database.name}"
+}
+
+# Grant the Cloud Run service account access to the secret
+resource "google_secret_manager_secret_iam_member" "cloud_run_secret_access" {
+  secret_id = google_secret_manager_secret.postgres_connection.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloud_run.email}"
+}
+
+# Add Secret Manager permissions to the Cloud Run service account
+resource "google_project_iam_member" "secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
