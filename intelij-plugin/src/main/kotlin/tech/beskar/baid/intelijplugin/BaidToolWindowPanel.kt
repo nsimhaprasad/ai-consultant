@@ -580,6 +580,8 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                         }
 
                         userProfileButton.removeAll()
+                        userProfileButton.text = ""
+                        userProfileButton.icon = null
                         userProfileButton.add(buttonPanel)
                     } else {
                         // Not logged in
