@@ -202,11 +202,6 @@ async def google_login_redirect(request: Request):
 
     redirect_uri = REDIRECT_URI
     try:
-        logger.info("Details of google callback")
-        logger.info(f"Code: {GOOGLE_CLIENT_ID}")
-        logger.info(f"Client id: {GOOGLE_CLIENT_ID}")
-        logger.info(f"secret id: {GOOGLE_CLIENT_SECRET}")
-        logger.info(f"redirect url id: {redirect_uri}")
         async with httpx.AsyncClient() as client:
             token_resp = await client.post(
                 "https://oauth2.googleapis.com/token",
