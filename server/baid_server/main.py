@@ -428,7 +428,12 @@ async def consult(
         raise HTTPException(status_code=400, detail="Invalid request body")
 
     user_input = data.get("prompt", "")
-    file_content = data.get("file_content", "")
+    context = data.get("context", "")
+    file_content = context.get("file_content", "")
+    file_path = context.get("file_path", "")
+    file_name = context.get("file_name", "")
+    is_open = context.get("is_open", False)
+    
 
     # Get the agent
     try:
@@ -462,10 +467,15 @@ async def consult(
                 chunk_buffer = ""
                 word_count = 0
 
+                if is_open:
+                    message = f"{user_input}\n\nFile content: {file_content}" + "\n" + user_input
+                else:
+                    message = user_input
+
                 for event in agent.stream_query(
                         user_id=user_id,
                         session_id=session_id,
-                        message=user_input
+                        message=message
                 ):
                     for part in event.get("content", {}).get("parts", []):
                         if "text" in part:

@@ -37,7 +37,7 @@ intellij {
     // You can pass the path as a system property when running Gradle:
     // ./gradlew runIde -DintellijPath=/path/to/your/intellij
 
-    plugins.set(listOf(/* Plugin Dependencies */))
+    plugins.set(listOf())
 }
 
 dependencies {

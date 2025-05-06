@@ -871,20 +871,33 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
         inputField.isEnabled = false
         consultButton.isEnabled = false
-        val editor = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).selectedTextEditor
+
+        // Get the currently open file from the editor
+        val fileEditorManager = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
+        val editor = fileEditorManager.selectedTextEditor
         val document = editor?.document
+        val virtualFile = fileEditorManager.selectedFiles.firstOrNull()
+
+        // Get file content and metadata
         val fileText = document?.text ?: "No file open."
+        val filePath = virtualFile?.path ?: "No file path available"
+        val fileName = virtualFile?.name ?: "No file name available"
 
         // Show thinking message
         appendMessage("Thinking...", isUser = false)
         val apiUrl = "${config.backendUrl}${config.apiEndpoint}"
 
-        val payload = JSONObject(
-            mapOf(
-                "prompt" to userPrompt,
-                "file_content" to fileText
-            )
-        )
+        // Create context JSONObject first
+        val contextJson = JSONObject()
+        contextJson.put("file_content", fileText)
+        contextJson.put("file_path", filePath)
+        contextJson.put("file_name", fileName)
+        contextJson.put("is_open", document != null)
+
+        // Create main payload JSONObject
+        val payload = JSONObject()
+        payload.put("prompt", userPrompt)
+        payload.put("context", contextJson)
 
         // Make streaming API request in background
         com.intellij.openapi.progress.ProgressManager.getInstance().run(
