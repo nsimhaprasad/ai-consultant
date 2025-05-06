@@ -47,13 +47,23 @@ const Features: React.FC = () => {
     },
     {
       icon: <Terminal size={24} />,
+      title: "Competent Pair",
+      description: "Similar to other code completion tools, but with a focus on maintainability."
+    },
+    {
+      icon: <Terminal size={24} />,
       title: "Automated Debugging",
-      description: "Quickly identify and fix bugs with intelligent analysis and suggestions."
+      description: "Quickly identify and fix bugs with intelligent analysis and suggestions, right in your terminal or IDE."
     },
     {
       icon: <FileSearch size={24} />,
       title: "Code Review & Refactoring",
       description: "Get recommendations to improve code quality and maintain SOLID principles."
+    },
+    {
+      icon: <FileSearch size={24} />,
+      title: "Smart CI Assist",
+      description: "Baid won't forget about you once you push your code. Monitor your pipeline, debug issues and inform you about likely causes."
     },
     {
       icon: <Shield size={24} />,
@@ -69,6 +79,11 @@ const Features: React.FC = () => {
       icon: <Cpu size={24} />,
       title: "IDE Integration",
       description: "Seamlessly integrates with VSCode, IntelliJ, and other popular IDEs."
+    },
+    {
+      icon: <Cpu size={24} />,
+      title: "Control your data",
+      description: "What happens in your environment, stays in your environment. Deploy baid for your engineers with a single-click deployment."
     }
   ];
 
@@ -86,8 +101,7 @@ const Features: React.FC = () => {
             <span className="gradient-text sub-heading">Powerful Features</span>
           </h2>
           <p className="text-lg text-surface-300 max-w-2xl mx-auto">
-            <b>baid</b> comes packed with features to help developers write better code faster,
-            debug more efficiently, and maintain high-quality codebases.
+            <b>baid</b> is different from other coding agents. It focuses on maintainability of your generated code along with security and performance.
           </p>
         </motion.div>
 

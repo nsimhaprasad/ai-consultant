@@ -57,24 +57,24 @@ const Testimonials: React.FC = () => {
   const testimonials = [
     {
       quote:
-        "Baid has completely transformed our development workflow. The debugging assistance alone has saved our team countless hours of frustration.",
-      author: "Sarah Johnson",
-      role: "CTO",
-      company: "TechFlow Inc.",
+        "Baid has the potential to replace all my other AI tools. It's getting so much better everyday. It's my goto for chats now.",
+      author: "Sriram KK",
+      role: "Developer",
+      company: "Beskar Tech",
     },
     {
       quote:
-        "The on-premise solution was exactly what we needed for our sensitive enterprise projects. Setup was smooth and the integration with our existing tools was seamless.",
-      author: "Michael Chen",
+        "The best part about baid for me is that this works with you while working on tool and works on the code even when I step out for lunch or sleep.",
+      author: "Narasimha Prasad",
       role: "Lead Developer",
-      company: "Enterprise Solutions",
+      company: "Beskar Tech",
     },
     {
       quote:
-        "Our junior developers have improved dramatically since we started using Baid. The code recommendations and best practice suggestions are like having a senior mentor available 24/7.",
-      author: "Alicia Rodriguez",
-      role: "Engineering Manager",
-      company: "Innovate Software",
+        "I call this Jake for all. It's like Jake watching your code changes and giving you suggestions real-time. Sometimes when I want bad code, or any code generated, I turn it off!",
+      author: "Nikshep",
+      role: "Developer",
+      company: "Beskar Tech",
     },
   ];
 
@@ -89,11 +89,10 @@ const Testimonials: React.FC = () => {
           className="text-center mb-16"
         >
           <h2 className="mb-4">
-            <span className="gradient-text sub-heading">What Developers Are Saying</span>
+            <span className="gradient-text sub-heading">What Our Developers Are Saying</span>
           </h2>
           <p className="text-lg text-surface-300 max-w-2xl mx-auto">
-            Trusted by development teams of all sizes, from startups to enterprise
-            organizations.
+            Our feature sets seem completely different from other coding agents. We focus on code quality, not just code generation and completion.
           </p>
         </motion.div>
 
