@@ -355,7 +355,7 @@ async def health_check():
     Health check endpoint for Cloud Run.
     Returns 200 OK if the server is running and all dependencies are healthy.
     """
-    logger.info("Health check endpoint called")
+    logger.debug("Health check endpoint called")
 
     health_status = {
         "status": "ok",
