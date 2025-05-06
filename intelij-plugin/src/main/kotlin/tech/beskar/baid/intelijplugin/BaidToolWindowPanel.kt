@@ -10,6 +10,10 @@ import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.ui.JBUI
+import com.vladsch.flexmark.html.HtmlRenderer
+import com.vladsch.flexmark.parser.Parser
+import com.vladsch.flexmark.util.ast.Node
+import com.vladsch.flexmark.util.data.MutableDataSet
 import org.json.JSONArray
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
@@ -22,6 +26,8 @@ import java.awt.event.MouseEvent
 import javax.swing.*
 
 class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindowPanel>(BorderLayout()) {
+    // HTML styling for message content
+    private val HTML_WRAPPER_STYLE = "word-wrap: break-word; margin: 0; padding: 0; width: 380px; max-width: 380px; overflow-wrap: break-word;"
     private val chatPanel = JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(8)))
     private val chatScroll = JBScrollPane(chatPanel)
     private val inputField = JBTextField(30)
@@ -751,17 +757,17 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         }
 
         // Create message text area
-        val messageText = JTextArea().apply {
-            text = message
+        val messageText = JTextPane().apply {
+            contentType = "text/html"
+            text = "<html><head><style>body {$HTML_WRAPPER_STYLE}</style></head><body>$message</body></html>"
             font = FontUtil.getBodyFont()
-            lineWrap = true
-            wrapStyleWord = true
             isEditable = false
             isOpaque = false
             background = Color(0, 0, 0, 0) // Transparent
             foreground = if (isUser) Color.BLACK else JBColor.foreground()
             border = JBUI.Borders.empty()
-            minimumSize = Dimension(0, preferredSize.height)
+            
+            // Simple maximum width constraint
             maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
         }
 
@@ -955,16 +961,17 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                 }
 
                                 // Create message text area
-                                val messageText = JTextArea().apply {
+                                val messageText = JTextPane().apply {
+                                    contentType = "text/html"
+                                    text = "<html><head><style>body {$HTML_WRAPPER_STYLE}</style></head><body></body></html>"
                                     font = FontUtil.getBodyFont()
-                                    lineWrap = true
-                                    wrapStyleWord = true
                                     isEditable = false
                                     isOpaque = false
                                     background = Color(0, 0, 0, 0)
                                     foreground = JBColor.foreground()
                                     border = JBUI.Borders.empty()
-                                    minimumSize = Dimension(0, preferredSize.height)
+                                    
+                                    // Simple maximum width constraint
                                     maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
                                 }
 
@@ -1063,19 +1070,25 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
     // Helper method to update message panel with streaming text
     private fun updateMessagePanel(messagePanel: JBPanel<*>, text: String) {
+        val options = MutableDataSet()
+        val parser = Parser.builder(options).build()
+        val htmlrenderer = HtmlRenderer.builder(options).build()
+
+        val document: Node = parser.parse(text)
+        val html: String? = htmlrenderer.render(document)
+
         SwingUtilities.invokeLater {
             try {
-                // Navigate through the panel structure to find the text area
                 val contentPanel = messagePanel.getComponent(0) as JBPanel<*>
                 val bubbleContainer = contentPanel.getComponent(1) as JBPanel<*>
-                val messageText = bubbleContainer.getComponent(0) as JTextArea
-                messageText.text = text
+                val messageText = bubbleContainer.getComponent(0) as JTextPane
+                messageText.text = "<html><head><style>body {$HTML_WRAPPER_STYLE}</style></head><body>$html</body></html>"
 
                 // Scroll to bottom
                 val vertical = chatScroll.verticalScrollBar
                 vertical.value = vertical.maximum
 
-                // Revalidate and repaint
+                // Refresh UI
                 messagePanel.revalidate()
                 messagePanel.repaint()
                 chatPanel.revalidate()
@@ -1094,8 +1107,8 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 try {
                     val contentPanel = lastMessage.getComponent(0) as JBPanel<*>
                     val bubbleContainer = contentPanel.getComponent(1) as JBPanel<*>
-                    val messageText = bubbleContainer.getComponent(0) as JTextArea
-                    if (messageText.text == "Thinking...") {
+                    val messageText = bubbleContainer.getComponent(0) as JTextPane
+                    if (messageText.text.contains("Thinking...")) {
                         chatPanel.remove(lastMessage)
                         chatPanel.revalidate()
                         chatPanel.repaint()

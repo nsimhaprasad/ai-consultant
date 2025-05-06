@@ -42,6 +42,7 @@ intellij {
 
 dependencies {
     implementation("org.json:json:20240303")
+    implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
 }
 
 tasks {
