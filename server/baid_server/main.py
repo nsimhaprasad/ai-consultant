@@ -2,6 +2,7 @@ import os
 import dotenv
 import logging
 import time
+import asyncio
 from typing import Optional, Dict
 from fastapi import FastAPI, Request, Header, HTTPException, Depends
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
@@ -10,11 +11,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from jose import jwt
 from google.adk.sessions import VertexAiSessionService
 from vertexai.preview import reasoning_engines
-import sqlite3
+import asyncpg
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 import httpx
 from threading import Timer
+from google.cloud import secretmanager
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -31,16 +33,76 @@ dotenv.load_dotenv()
 app = FastAPI()
 
 # Configuration
-GOOGLE_CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
-GOOGLE_CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]
-JWT_SECRET = os.environ["JWT_SECRET"]
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8080/api/auth/google-login")
 
+# DB configuration - from secret manager by default
+DB_CONNECTION_SECRET = os.environ.get("DB_CONNECTION_SECRET", "postgres-connection")
+
+# Direct DB config for local dev and testing
+DB_HOST = os.environ.get("DB_HOST", "localhost")
+DB_PORT = os.environ.get("DB_PORT", "5432")
+DB_NAME = os.environ.get("DB_NAME", "ai_consultant_db")
+DB_USER = os.environ.get("DB_USER", "baid-dev")
+DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
+
 # Add streaming configuration
 ENABLE_WORD_BY_WORD_STREAMING = os.getenv("ENABLE_WORD_BY_WORD_STREAMING", "true").lower() == "true"
-# ENABLE_WORD_BY_WORD_STREAMING = False
 logger.info(f"Word-by-word streaming: {'ENABLED' if ENABLE_WORD_BY_WORD_STREAMING else 'DISABLED'}")
+
+# Project ID for Google Cloud
+PROJECT_ID = os.getenv("PROJECT_ID", "742371152853")
+
+# Database connection pool
+db_pool = None
+
+
+async def get_db_pool():
+    """Get a connection pool to the PostgreSQL database."""
+    global db_pool
+    if db_pool is None:
+        try:
+            # Get connection string from Secret Manager in production or env vars in development
+            if os.getenv("ENVIRONMENT") == "development" and DB_PASSWORD:
+                # For local development, use env vars
+                connection_string = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+                logger.info("Using local database connection from environment variables")
+            else:
+                # For production, get from Secret Manager
+                connection_string = await get_secret(DB_CONNECTION_SECRET)
+                logger.info(f"Using database connection from Secret Manager: {DB_CONNECTION_SECRET}")
+
+            # Create connection pool
+            db_pool = await asyncpg.create_pool(
+                dsn=connection_string,
+                min_size=1,
+                max_size=10,
+                timeout=30
+            )
+
+            logger.info("Database connection pool created successfully")
+        except Exception as e:
+            logger.error(f"Failed to create database connection pool: {str(e)}")
+            raise
+    return db_pool
+
+
+async def get_secret(secret_id):
+    """Get secret from Secret Manager."""
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/latest"
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode("UTF-8")
+    except Exception as e:
+        logger.error(f"Error accessing secret {secret_id}: {str(e)}")
+        # Fallback for testing if explicitly set
+        if os.getenv("ENVIRONMENT") == "testing":
+            return f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+        raise
 
 
 class GoogleCodeRequest(BaseModel):
@@ -59,6 +121,73 @@ OAUTH_SESSION_TTL = 300
 
 def cleanup_state(state):
     oauth_sessions.pop(state, None)
+
+
+# Database functions - now using PostgreSQL with asyncpg
+async def store_user(userinfo):
+    """Store user in the database."""
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        try:
+            await conn.execute('''
+            INSERT INTO users (email, name, picture) 
+            VALUES ($1, $2, $3)
+            ON CONFLICT (email) 
+            DO UPDATE SET name = $2, picture = $3
+            ''', userinfo["email"], userinfo["name"], userinfo.get("picture"))
+            logger.info(f"User stored/updated: {userinfo['email']}")
+        except Exception as e:
+            logger.error(f"Error storing user: {str(e)}")
+            raise
+
+
+async def store_session_mapping(user_id, session_id):
+    """Store or update user session mapping."""
+    logger.info(f"Storing/updating session mapping: user_id={user_id}, session_id={session_id}")
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        try:
+            await conn.execute('''
+            INSERT INTO user_sessions (user_id, session_id)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id, session_id)
+            DO UPDATE SET last_used_at = CURRENT_TIMESTAMP
+            ''', user_id, session_id)
+            logger.info(f"Session mapping stored/updated: user_id={user_id}, session_id={session_id}")
+        except Exception as e:
+            logger.error(f"Error storing session mapping: {str(e)}")
+            raise
+
+
+async def store_message(user_id, session_id, role, content):
+    """Store message in the database."""
+    logger.debug(f"Storing message: user_id={user_id}, session_id={session_id}, role={role}")
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        try:
+            await conn.execute('''
+            INSERT INTO messages (user_id, session_id, role, content)
+            VALUES ($1, $2, $3, $4)
+            ''', user_id, session_id, role, content)
+            logger.debug(f"Message stored successfully")
+        except Exception as e:
+            logger.error(f"Error storing message: {str(e)}")
+            # Continue execution even if message storage fails
+
+
+async def session_exists(user_id, session_id):
+    """Check if session exists in the database."""
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        try:
+            result = await conn.fetchval('''
+            SELECT id FROM user_sessions
+            WHERE user_id = $1 AND session_id = $2
+            ''', user_id, session_id)
+            return result is not None
+        except Exception as e:
+            logger.error(f"Error checking session existence: {str(e)}")
+            return False
 
 
 @app.get("/api/auth/google-login")
@@ -108,7 +237,7 @@ async def google_login_redirect(request: Request):
             return HTMLResponse(content=html_content, status_code=400)
 
         userinfo = resp.json()
-        store_user(userinfo)
+        await store_user(userinfo)
 
         backend_token = jwt.encode({
             "sub": userinfo["email"],
@@ -146,110 +275,6 @@ async def get_oauth_session(state: str):
     return JSONResponse(content=session)
 
 
-# Database functions
-def init_db():
-    logger.info("Initializing database")
-    try:
-        conn = sqlite3.connect('/tmp/sessions.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE,
-            name TEXT,
-            picture TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )''')
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
-            session_id TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_id, session_id)
-        )''')
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
-            session_id TEXT,
-            role TEXT,
-            content TEXT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )''')
-        conn.commit()
-        conn.close()
-        logger.info("Database initialization completed successfully")
-    except Exception as e:
-        logger.error(f"Database initialization failed: {str(e)}")
-        raise
-
-
-def store_user(userinfo):
-    conn = sqlite3.connect('/tmp/sessions.db')
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''INSERT OR IGNORE INTO users (email, name, picture) VALUES (?, ?, ?)''',
-                       (userinfo["email"], userinfo["name"], userinfo.get("picture")))
-        conn.commit()
-    except Exception as e:
-        logger.error(f"Error storing user: {str(e)}")
-    finally:
-        conn.close()
-
-
-def store_session_mapping(user_id, session_id):
-    logger.info(f"Storing/updating session mapping: user_id={user_id}, session_id={session_id}")
-    conn = sqlite3.connect('/tmp/sessions.db')
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "INSERT INTO user_sessions (user_id, session_id) VALUES (?, ?)",
-            (user_id, session_id)
-        )
-        conn.commit()
-    except sqlite3.IntegrityError:
-        cursor.execute(
-            "UPDATE user_sessions SET last_used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND session_id = ?",
-            (user_id, session_id)
-        )
-        conn.commit()
-    except Exception as e:
-        logger.error(f"Error storing session mapping: {str(e)}")
-        raise
-    finally:
-        conn.close()
-
-
-def store_message(user_id, session_id, role, content):
-    logger.debug(f"Storing message: user_id={user_id}, session_id={session_id}, role={role}")
-    conn = sqlite3.connect('/tmp/sessions.db')
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "INSERT INTO messages (user_id, session_id, role, content) VALUES (?, ?, ?, ?)",
-            (user_id, session_id, role, content)
-        )
-        conn.commit()
-    except Exception as e:
-        logger.error(f"Error storing message: {str(e)}")
-    finally:
-        conn.close()
-
-
-def session_exists(user_id, session_id):
-    conn = sqlite3.connect('/tmp/sessions.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT id FROM user_sessions WHERE user_id = ? AND session_id = ?",
-        (user_id, session_id)
-    )
-    result = cursor.fetchone()
-    conn.close()
-    return result is not None
-
-
 logger.info("Initializing agent configuration")
 
 # First priority: Get AGENT_ENGINE_ID from environment variable
@@ -269,8 +294,6 @@ if not AGENT_ENGINE_ID:
             logger.error(f"Error reading agent resource file: {str(e)}")
 
 # Agent configuration
-# AGENT_ENGINE_ID = 'projects/742371152853/locations/us-central1/reasoningEngines/988619283045023744'
-PROJECT_ID = os.getenv("PROJECT_ID", "742371152853")
 LOCATION = os.getenv("LOCATION", "us-central1")
 AGENT_ENGINE_ID_ONLY = AGENT_ENGINE_ID.split('/')[-1]
 REASONING_ENGINE_APP_NAME = AGENT_ENGINE_ID_ONLY
@@ -282,9 +305,6 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize VertexAiSessionService: {str(e)}")
     raise
-
-# Initialize database at startup
-init_db()
 
 # Auth configuration
 bearer_scheme = HTTPBearer()
@@ -298,19 +318,39 @@ def get_current_user(token: HTTPAuthorizationCredentials = Depends(bearer_scheme
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
+@app.on_event("startup")
+async def startup():
+    """Initialize the database pool on startup."""
+    try:
+        await get_db_pool()
+    except Exception as e:
+        logger.error(f"Failed to initialize database pool: {str(e)}")
+        # Continue startup even if DB fails, to allow health checks
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Close the database pool on shutdown."""
+    global db_pool
+    if db_pool:
+        await db_pool.close()
+        logger.info("Database connection pool closed")
+
+
 @app.get("/")
 def read_root():
     logger.info("Root endpoint called")
     return {
         "message": "Server is running",
         "agent_engine_id": AGENT_ENGINE_ID,
-        "word_by_word_streaming": ENABLE_WORD_BY_WORD_STREAMING
+        "word_by_word_streaming": ENABLE_WORD_BY_WORD_STREAMING,
+        "database": "PostgreSQL"
     }
 
 
 # Dedicated health check endpoint for Cloud Run
 @app.get("/health")
-def health_check():
+async def health_check():
     """
     Health check endpoint for Cloud Run.
     Returns 200 OK if the server is running and all dependencies are healthy.
@@ -328,13 +368,11 @@ def health_check():
         }
     }
 
-    # Check database connection
+    # Check database connection with PostgreSQL
     try:
-        conn = sqlite3.connect('/tmp/sessions.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        cursor.fetchone()
-        conn.close()
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            await conn.fetchval("SELECT 1")
     except Exception as e:
         logger.error(f"Database health check failed: {str(e)}")
         health_status["checks"]["database"] = "failed"
@@ -404,18 +442,18 @@ async def consult(
             vertex_session = agent.create_session(user_id=user_id)
             session_id = vertex_session["id"]
             user_id = vertex_session["user_id"]
-            store_session_mapping(user_id, session_id)
+            await store_session_mapping(user_id, session_id)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to create new session: {str(e)}")
     else:
-        if not session_exists(user_id, session_id):
-            store_session_mapping(user_id, session_id)
+        if not await session_exists(user_id, session_id):
+            await store_session_mapping(user_id, session_id)
 
     # Store user message
-    store_message(user_id, session_id, "user", user_input)
+    await store_message(user_id, session_id, "user", user_input)
 
     # Choose streaming mode based on configuration
-    def generate_streaming_response():
+    async def generate_streaming_response():
         full_response = ""
 
         try:
@@ -466,7 +504,7 @@ async def consult(
                                 if any(char in word for char in '.!?'):
                                     word_delay = 0.4
 
-                                time.sleep(word_delay)
+                                await asyncio.sleep(word_delay)
 
                             # If buffer ends with space, we've processed all words
                             if chunk_buffer.endswith(' '):
@@ -477,7 +515,7 @@ async def consult(
                     full_response += chunk_buffer + " "
                     sse_data = f"data: {chunk_buffer} \n\n"
                     yield sse_data
-                    time.sleep(0.1)
+                    await asyncio.sleep(0.1)
 
             else:
                 # Chunk-based streaming (original behavior)
@@ -492,7 +530,7 @@ async def consult(
                             full_response += chunk
                             sse_data = f"data: {chunk}\n\n"
                             yield sse_data
-                            time.sleep(0.01)
+                            await asyncio.sleep(0.01)
 
             # Send session_id and final marker
             session_data = f"data: {{\"session_id\": \"{session_id}\"}}\n\n"
@@ -502,7 +540,7 @@ async def consult(
             yield final_marker
 
             # Store the complete response
-            store_message(user_id, session_id, "agent", full_response.strip())
+            await store_message(user_id, session_id, "agent", full_response.strip())
 
         except Exception as e:
             logger.error(f"[{request_id}] Error in streaming response: {str(e)}", exc_info=True)
@@ -524,23 +562,23 @@ async def consult(
 
 @app.get("/sessions/{user_id}")
 async def get_user_sessions(user_id: str):
-    conn = sqlite3.connect('/tmp/sessions.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT session_id, created_at, last_used_at FROM user_sessions WHERE user_id = ? ORDER BY last_used_at DESC",
-        (user_id,)
-    )
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch('''
+        SELECT session_id, created_at, last_used_at 
+        FROM user_sessions 
+        WHERE user_id = $1 
+        ORDER BY last_used_at DESC
+        ''', user_id)
 
     sessions = []
-    for row in cursor.fetchall():
+    for row in rows:
         sessions.append({
-            "session_id": row[0],
+            "session_id": row['session_id'],
             "user_id": user_id,
-            "created_at": row[1],
-            "last_used_at": row[2]
+            "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+            "last_used_at": row['last_used_at'].isoformat() if row['last_used_at'] else None
         })
-
-    conn.close()
 
     if not sessions:
         raise HTTPException(status_code=404, detail=f"No sessions found for user {user_id}")
@@ -550,22 +588,22 @@ async def get_user_sessions(user_id: str):
 
 @app.get("/history/{user_id}/{session_id}")
 async def get_session_history(user_id: str, session_id: str):
-    conn = sqlite3.connect('/tmp/sessions.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT role, content, timestamp FROM messages WHERE user_id = ? AND session_id = ? ORDER BY timestamp ASC",
-        (user_id, session_id)
-    )
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch('''
+        SELECT role, content, timestamp 
+        FROM messages 
+        WHERE user_id = $1 AND session_id = $2 
+        ORDER BY timestamp ASC
+        ''', user_id, session_id)
 
     history = []
-    for row in cursor.fetchall():
+    for row in rows:
         history.append({
-            "role": row[0],
-            "message": row[1],
-            "timestamp": row[2]
+            "role": row['role'],
+            "message": row['content'],
+            "timestamp": row['timestamp'].isoformat() if row['timestamp'] else None
         })
-
-    conn.close()
 
     if not history:
         raise HTTPException(status_code=404, detail=f"No history found for session {session_id}")
@@ -587,26 +625,25 @@ async def delete_session(user_id: str, session_id: str):
             session_id=session_id
         )
 
-        # Delete from local DB
-        conn = sqlite3.connect('/tmp/sessions.db')
-        cursor = conn.cursor()
+        # Delete from database
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            # Use a transaction to ensure both deletions happen or neither does
+            async with conn.transaction():
+                await conn.execute(
+                    "DELETE FROM user_sessions WHERE user_id = $1 AND session_id = $2",
+                    user_id, session_id
+                )
 
-        cursor.execute(
-            "DELETE FROM user_sessions WHERE user_id = ? AND session_id = ?",
-            (user_id, session_id)
-        )
-
-        cursor.execute(
-            "DELETE FROM messages WHERE user_id = ? AND session_id = ?",
-            (user_id, session_id)
-        )
-
-        conn.commit()
-        conn.close()
+                await conn.execute(
+                    "DELETE FROM messages WHERE user_id = $1 AND session_id = $2",
+                    user_id, session_id
+                )
 
         return {"message": f"Session {session_id} for user {user_id} deleted successfully"}
 
     except Exception as e:
+        logger.error(f"Error deleting session: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting session: {str(e)}")
 
 
@@ -622,6 +659,6 @@ app.add_middleware(
 if __name__ == "__main__":
     import uvicorn
 
-    port = 8080
+    port = int(os.getenv("PORT", "8080"))
     logger.info(f"Starting server on port {port}")
     uvicorn.run("main:app", host="0.0.0.0", port=port)

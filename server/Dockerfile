@@ -2,7 +2,7 @@
 FROM python:3.12-slim AS builder
 WORKDIR /app
 
-# Install build dependencies for Tree-sitter
+# Install build dependencies for Tree-sitter and PostgreSQL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     pkg-config \
     git \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files first
@@ -29,9 +30,10 @@ WORKDIR /app
 # Create a non-root user for security
 RUN useradd -m appuser
 
-# Install runtime dependencies for Tree-sitter
+# Install runtime dependencies for Tree-sitter and PostgreSQL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed dependencies from builder
@@ -45,15 +47,29 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app code
 COPY baid_server ./baid_server
 
+# Ensure scripts and migrations directories exist
+RUN mkdir -p /app/scripts /app/migrations
+
+# Copy migration files and scripts
+COPY scripts/run_migrations.py /app/scripts/
+COPY migrations/*.sql /app/migrations/
+
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
-    PORT=8080
+    PORT=8080 \
+    PYTHONPATH=/app
+
+# Make script executable
+RUN chmod +x /app/scripts/run_migrations.py
+
+# Change ownership of app files to appuser
+RUN chown -R appuser:appuser /app
 
 # Use non-root user
 USER appuser
 
 # Default command (can be overridden by docker-compose or k8s)
-CMD ["uvicorn", "baid_server.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["sh", "-c", "python /app/scripts/run_migrations.py && uvicorn baid_server.main:app --host 0.0.0.0 --port 8080"]
 
 # --- Development override ---
 # To enable hot reload in dev, override CMD and mount source code

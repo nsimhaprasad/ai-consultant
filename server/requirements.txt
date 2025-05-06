@@ -2,6 +2,13 @@ fastapi
 uvicorn
 python-dotenv
 google-cloud-aiplatform[adk,agent_engines]
+google-cloud-storage
 httpx
 python-jose
 pydantic
+aiofiles
+asyncpg
+google-cloud-secret-manager
+psycopg2-binary
+setuptools
+wheel

@@ -254,6 +254,8 @@ jobs:
             "GOOGLE_REDIRECT_URI=${{ vars.BAID_REDIRECT_URI }}"
             "ENABLE_WORD_BY_WORD_STREAMING=true"
             "VERSION=${{ env.VERSION }}"
+            "DB_CONNECTION_SECRET=postgres-connection"
+            "ENVIRONMENT=production"
           )
           ENV_VARS_STRING=$(IFS=,; echo "${ENV_VARS[*]}")
           
