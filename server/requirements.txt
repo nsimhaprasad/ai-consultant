@@ -12,3 +12,4 @@ google-cloud-secret-manager
 psycopg2-binary
 setuptools
 wheel
+pydantic[email]

@@ -13,7 +13,7 @@ from google.adk.sessions import VertexAiSessionService
 from vertexai.preview import reasoning_engines
 import asyncpg
 from datetime import datetime, timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 import httpx
 from threading import Timer
 from google.cloud import secretmanager
@@ -655,6 +655,51 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class WaitlistRequest(BaseModel):
+    email: EmailStr  
+    name: str = None
+    role: str = None
+    referral_source: str = None
+
+
+@app.post("/api/waitlist")
+async def register_waitlist(request: Request, waitlist_req: WaitlistRequest):
+    request_id = os.urandom(4).hex()
+    logger.info(f"[{request_id}] Waitlist registration request received for: {waitlist_req.email}")
+
+    # Get the client's IP address
+    client_ip = request.client.host
+    logger.info(f"[{request_id}] Client IP: {client_ip}")
+
+    try:
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            # Insert the user into the waitlist table with IP address
+            await conn.execute('''
+            INSERT INTO waitlist (email, name, role, referral_source, ip_address)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (email) 
+            DO UPDATE SET 
+                name = COALESCE($2, waitlist.name),
+                role = COALESCE($3, waitlist.role),
+                referral_source = COALESCE($4, waitlist.referral_source),
+                ip_address = $5
+            ''', waitlist_req.email, waitlist_req.name, waitlist_req.role, waitlist_req.referral_source, client_ip)
+
+        logger.info(f"[{request_id}] User added to waitlist: {waitlist_req.email} (IP: {client_ip})")
+
+        return {
+            "status": "success",
+            "message": "Thank you for joining our waitlist!",
+            "email": waitlist_req.email
+        }
+
+    except Exception as e:
+        logger.error(f"[{request_id}] Error adding user to waitlist: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to register: {str(e)}")
+
 
 if __name__ == "__main__":
     import uvicorn
