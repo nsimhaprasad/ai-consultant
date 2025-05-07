@@ -32,7 +32,7 @@ const Navbar: React.FC = () => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 text-white">
-            <img src="/images/logo-hr.svg" alt="baid logo" className="h-8" />
+            <img src="/images/logo-hr.svg" alt="baid logo" className="h-12" />
           </Link>
 
           {/* Desktop Navigation */}
