@@ -2,12 +2,13 @@ name: "Cleanup Old Agents"
 
 on:
   workflow_run:
-    workflows: ["Server CI"]
+    workflows: [ "Server CI" ]
     types:
       - completed
 
 permissions:
   contents: read
+  actions: read  # Added this permission to read artifacts
 
 jobs:
   cleanup:
@@ -18,9 +19,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Check if this was part of the AI Consultant Agent -> Server deployment chain
+      # Try GitHub's official download action first
       - name: Download server deployment completion signal
+        uses: actions/download-artifact@v4
+        id: download_artifact
+        continue-on-error: true
+        with:
+          name: server_deployment_complete
+          path: ./signals
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      # Fallback to the dawidd6 action if the official one fails
+      - name: Alternative download method
+        if: steps.download_artifact.outcome == 'failure'
         uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
         with:
           workflow: ${{ github.event.workflow_run.workflow_id }}
           run_id: ${{ github.event.workflow_run.id }}
@@ -35,8 +49,11 @@ jobs:
         run: |
           if [ -f "./signals/server_deployment_complete.txt" ]; then
             echo "signal_found=true" >> $GITHUB_OUTPUT
+            echo "Found deployment completion signal:"
+            cat ./signals/server_deployment_complete.txt
           else
             echo "signal_found=false" >> $GITHUB_OUTPUT
+            echo "No deployment completion signal found"
           fi
 
       # Only proceed with cleanup if the signal file was found
@@ -103,6 +120,3 @@ jobs:
         if: steps.check_signal.outputs.signal_found == 'false'
         run: |
           echo "ℹ️ Skipping cleanup as this was not triggered by the AI Consultant Agent deployment chain"
-          
-          
-          v=spf1 include:spf.efwd.registrar-servers.com ~all
