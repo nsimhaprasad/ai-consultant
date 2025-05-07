@@ -24,13 +24,13 @@ const Hero: React.FC = () => {
             <div className="mb-6">
               <span className="badge badge-primary mb-8">Intelligent Coding Assistant</span>
               <h1 className="mb-8 title">
-                <span className="gradient-text">A Clean Code Agent</span>
+                <span className="gradient-text">An agent ecosystem</span>
                 <br />
-                for your environment
+                that works for you
               </h1>
               <p className="text-lg md:text-xl text-surface-300 mb-8 max-w-lg md:leading-loose">
-                A powerful clean code agent that implements your ideas, suggests improvements, and ensures code quality.
-                It can run in your <b>own environment</b> or <b>in the cloud</b>, making it easy to integrate into your workflow.
+                A powerful clean code agent that implements your ideas, reviews, refactors and monitors your changes.
+                It runs in your <b>environment</b> or <b>in the cloud</b>, making it easy to integrate into your workflow.
               </p>
             </div>
 

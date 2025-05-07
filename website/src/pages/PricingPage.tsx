@@ -31,10 +31,12 @@ const PricingPage: React.FC = () => {
       price: "$8",
       priceDetails: "/month",
       features: [
-        { text: "AI code assistance", included: true },
-        { text: "Basic debugging help", included: true },
-        { text: "Standard refactoring suggestions", included: true },
+        { text: "AI code complete", included: true },
+        { text: "Basic Agent", included: true },
+        { text: "Basic debugging", included: true },
+        { text: "Standard code review", included: true },
         { text: "Single IDE integration", included: true },
+        { text: "Basic CI/CD agent", included: false },
         { text: "Advanced security analysis", included: false },
         { text: "Team collaboration features", included: false },
         { text: "Custom model training", included: false },
@@ -44,15 +46,17 @@ const PricingPage: React.FC = () => {
       buttonLink: "/hosted",
     },
     {
-      name: "Pro",
+      name: "Super",
       description: "Ideal for professional developers and growing teams",
       price: "$15",
       priceDetails: "/month",
       features: [
-        { text: "AI code assistance", included: true },
+        { text: "AI code complete", included: true },
+        { text: "Advanced Agent", included: true },
         { text: "Advanced debugging", included: true },
-        { text: "Advanced refactoring suggestions", included: true },
+        { text: "Advanced code review", included: true },
         { text: "Multiple IDE integrations", included: true },
+        { text: "Basic CI/CD agent", included: true },
         { text: "Basic security analysis", included: true },
         { text: "Team collaboration features", included: true },
         { text: "Custom model training", included: false },
@@ -67,15 +71,16 @@ const PricingPage: React.FC = () => {
       price: "Custom",
       priceDetails: "",
       features: [
-        { text: "AI code assistance", included: true },
+        { text: "AI code complete", included: true },
+        { text: "Advanced Agent", included: true },
         { text: "Advanced debugging", included: true },
-        { text: "Advanced refactoring suggestions", included: true },
-        { text: "All IDE integrations", included: true },
+        { text: "Advanced code review", included: true },
+        { text: "Multiple IDE integrations", included: true },
+        { text: "Advanced CI/CD agent", included: true },
         { text: "Unlimited code analysis", included: true },
-        { text: "24/7 premium support with SLA", included: true },
-        { text: "Advanced security analysis", included: true },
         { text: "Advanced team collaboration", included: true },
         { text: "Custom model training", included: true },
+        { text: "24/7 premium support with SLA", included: true },
       ],
       highlighted: false,
       buttonText: "Contact Sales",
@@ -87,7 +92,7 @@ const PricingPage: React.FC = () => {
   const faqItems = [
     {
       question: "What's included in the Starter plan?",
-      answer: "The Starter plan includes AI code assistance for generating code suggestions, basic debugging help, standard refactoring suggestions, integration with one IDE of your choice, 5 GB of code analysis per month, and email support. It's perfect for individual developers and small projects."
+      answer: "The Starter plan includes AI code completion, basic debugging, basic code review, and single IDE integration. It's perfect for individual developers on a budget."
     },
     {
       question: "How does the billing work?",
@@ -99,15 +104,15 @@ const PricingPage: React.FC = () => {
     },
     {
       question: "Is there a free trial?",
-      answer: "Yes, we offer a 14-day free trial on the Starter and Pro plans so you can test the features before committing. No credit card is required for the trial."
+      answer: "Yes, we offer a 14-day free trial on the Starter and Super plans so you can test the features before committing. No credit card is required for the trial."
     },
     {
       question: "What's the difference between hosted and on-premise solutions?",
       answer: "Our hosted solution is a fully managed service where we handle all the infrastructure, updates, and maintenance. The on-premise solution is deployed within your own infrastructure, giving you complete control over the environment and ensuring your data never leaves your network."
     },
     {
-      question: "How does the Enterprise plan differ from the Pro plan?",
-      answer: "The Enterprise plan includes unlimited code analysis, 24/7 premium support with SLA, advanced security analysis, enhanced team collaboration features, and custom model training. It also offers additional customization options and integration capabilities that aren't available in the Pro plan."
+      question: "How does the Enterprise plan differ from the Super plan?",
+      answer: "The Enterprise plan includes unlimited code analysis, 24/7 premium support with SLA, advanced security analysis, enhanced team collaboration features, and custom model training. It also offers additional customization options and integration capabilities that aren't available in the Super plan."
     },
   ];
 

@@ -39,14 +39,13 @@ const HostedPage: React.FC = () => {
               <div className="mb-8">
                 <span className="badge badge-primary mb-8">Hosted Solution</span>
                 <h1 className="mb-8 title">
-                  <span className="gradient-text">Write Better Code</span>
+                  <span className="gradient-text">Deliver better code</span>
                   <br />
-                  Without the Setup Hassle
+                  with high quality
                 </h1>
                 <p className="text-lg md:text-xl text-surface-300 mb-8 max-w-lg md:leading-loose">
-                  Our fully managed cloud solution gives you all the power of <b>baid </b>
-                  with zero infrastructure maintenance, automatic updates, and immediate
-                  availability.
+                    <b>baid</b> can integrate with your tools in minutes. It not only helps you develop, and debug but also monitors your deployments.
+                    It's a one-stop solution for all your coding needs.
                 </p>
               </div>
 
@@ -81,7 +80,7 @@ const HostedPage: React.FC = () => {
             className="text-center mb-16"
           >
             <h2 className="mb-4">
-              <span className="gradient-text sub-heading">Hosted Solution Benefits</span>
+              <span className="gradient-text sub-heading">Hosted Baid Benefits</span>
             </h2>
             <p className="text-lg text-surface-300 max-w-2xl mx-auto">
               Get all the power of <b>baid without worrying about infrastructure,</b>
@@ -95,7 +94,7 @@ const HostedPage: React.FC = () => {
               <Bot className="h-8 w-8 text-primary-500 mb-4" />
               <h3 className="text-xl font-semibold mb-2">Zero Setup Time</h3>
               <p className="text-surface-300 mb-4">
-                Start using <b>baid immediately after sign-up with no complex</b>
+                Start using <b>baid immediately after sign-up with no complex </b>
                 configuration or installation required.
               </p>
               <ul className="space-y-2">
