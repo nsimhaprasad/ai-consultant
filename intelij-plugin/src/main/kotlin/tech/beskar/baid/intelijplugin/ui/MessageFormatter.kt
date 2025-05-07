@@ -29,12 +29,12 @@ class MessageFormatter {
     companion object {
         // HTML styling for message content - base style without width (added dynamically)
         private const val HTML_WRAPPER_STYLE = "word-wrap: break-word; margin: 0; padding: 0; overflow-wrap: break-word;"
-        
+
         // Markdown parser and renderer
         private val options = MutableDataSet()
         private val parser = Parser.builder(options).build()
         private val htmlRenderer = HtmlRenderer.builder(options).build()
-        
+
         /**
          * Process a message and extract code blocks
          * @param message The raw message text
@@ -45,7 +45,7 @@ class MessageFormatter {
             val codeBlockPattern = "```(?:([a-zA-Z0-9]+)\\s+)?([\\s\\S]*?)```".toRegex()
             val codeBlocks = mutableListOf<Triple<String, String, String>>()
             var codeBlockCounter = 0
-            
+
             // Replace code blocks with unique placeholders that won't be processed by Markdown
             var processedMessage = message.replace(codeBlockPattern) { matchResult ->
                 val language = matchResult.groupValues[1].ifEmpty { "text" } // Language identifier (default to "text")
@@ -55,18 +55,18 @@ class MessageFormatter {
                 // Use a special HTML comment that won't be affected by Markdown processing
                 "<!-- ${placeholder} -->"
             }
-            
+
             // Step 2: Pre-process numbered lists and bullet points before Markdown processing
             processedMessage = preProcessLists(processedMessage)
-            
+
             // Step 3: Parse and render the processed text with Markdown
-            val htmlrenderer = HtmlRenderer.builder(options).build()        
+            val htmlrenderer = HtmlRenderer.builder(options).build()
             val document: Node = parser.parse(processedMessage)
             var html: String = htmlrenderer.render(document) ?: ""
-            
+
             // Step 4: Post-process the HTML to improve formatting and handle placeholders
             val cleanedHtml = postProcessHtml(html, codeBlocks)
-            
+
             // Wrap the HTML in proper structure with styling
             val wrappedHtml = """
                 <html>
@@ -79,17 +79,19 @@ class MessageFormatter {
                             .list-item { display: block; margin-bottom: 1em; padding: 0.2em 0; } /* Custom list items with more spacing */
                             .list-marker { font-weight: bold; margin-right: 0.5em; } /* Make list markers stand out */
                             br + br { display: none; } /* Remove double line breaks */
-                            .code-placeholder-wrapper { display: block; margin: 0.5em 0; } /* Wrapper for code placeholders */
+                            .code-placeholder-wrapper { display: block; margin: 0.8em 0; background-color: #1e1e1e; border-radius: 4px; } /* Wrapper for code placeholders with dark background */
                             .code-placeholder { display: none; } /* Hide code placeholders */
+                            pre { background-color: #1e1e1e; color: #dcdcdc; padding: 10px; border-radius: 4px; } /* Style for pre elements to match code blocks */
+                            code { background-color: #2d2d2d; color: #dcdcdc; padding: 2px 4px; border-radius: 3px; } /* Style for inline code */
                         </style>
                     </head>
                     <body>$cleanedHtml</body>
                 </html>
             """.trimIndent()
-            
+
             return Pair(wrappedHtml, codeBlocks)
         }
-        
+
         /**
          * Pre-process lists to ensure proper formatting
          * @param text The text to format
@@ -97,7 +99,7 @@ class MessageFormatter {
          */
         private fun preProcessLists(text: String): String {
             var result = text
-            
+
             // Process ordered lists (1., 2., etc.)
             val orderedListPattern = Regex("(^|\\n)(\\d+\\.)\\s(.+)")
             result = orderedListPattern.replace(result) { matchResult ->
@@ -106,7 +108,7 @@ class MessageFormatter {
                 val content = matchResult.groupValues[3] // The actual list item content
                 "${prefix}ORDERED_LIST_ITEM_${number}_START ${content} ORDERED_LIST_ITEM_END"
             }
-            
+
             // Process unordered lists (* or -)
             val unorderedListPattern = Regex("(^|\\n)(\\*|-)\\s(.+)")
             result = unorderedListPattern.replace(result) { matchResult ->
@@ -115,15 +117,15 @@ class MessageFormatter {
                 val content = matchResult.groupValues[3] // The actual list item content
                 "${prefix}UNORDERED_LIST_ITEM_${marker}_START ${content} UNORDERED_LIST_ITEM_END"
             }
-            
+
             // Replace standalone asterisks with newline markers
             // This handles cases like "* This is a point" where the asterisk is not at the start of a line
             result = result.replace(" * ", " STANDALONE_ASTERISK ") // Mark standalone asterisks
                       .replace("\\n * ", "\\n STANDALONE_ASTERISK ") // Mark asterisks after newline with space
-            
+
             return result
         }
-        
+
         /**
          * Post-process the HTML to improve formatting and handle placeholders
          * @param html The HTML to process
@@ -132,14 +134,14 @@ class MessageFormatter {
          */
         private fun postProcessHtml(html: String, codeBlocks: List<Triple<String, String, String>>): String {
             var result = html
-            
+
             // Step 1: Fix common HTML spacing issues
             result = result
                 .replace("<p><br></p>", "<br>") // Remove excessive paragraph spacing
                 .replace("<br><br>", "<br>") // Fix double line breaks
                 .replace("<body>\n<p>", "<body><p>") // Remove extra space at the top
                 .replace("<body>\n<br>", "<body>") // Remove extra space at the top
-            
+
             // Step 2: Process ordered list items
             val orderedListPattern = Regex("ORDERED_LIST_ITEM_(\\d+\\.)_START\\s(.+?)\\sORDERED_LIST_ITEM_END")
             result = orderedListPattern.replace(result) { matchResult ->
@@ -147,7 +149,7 @@ class MessageFormatter {
                 val content = matchResult.groupValues[2]
                 "<div class='list-item'><span class='list-marker'>$number</span> $content</div>"
             }
-            
+
             // Step 3: Process unordered list items
             val unorderedListPattern = Regex("UNORDERED_LIST_ITEM_([\\*-])_START\\s(.+?)\\sUNORDERED_LIST_ITEM_END")
             result = unorderedListPattern.replace(result) { matchResult ->
@@ -155,10 +157,10 @@ class MessageFormatter {
                 val content = matchResult.groupValues[2]
                 "<div class='list-item'><span class='list-marker'>$marker</span> $content</div>"
             }
-            
+
             // Step 3.5: Replace standalone asterisks with line breaks and bullet points
             result = result.replace(" STANDALONE_ASTERISK ", "<br>• ")
-            
+
             // Step 4: Ensure code blocks are preserved as placeholders
             for ((placeholder, _, _) in codeBlocks) {
                 // Convert HTML comments back to actual placeholders
@@ -166,10 +168,10 @@ class MessageFormatter {
                 // Also handle any direct placeholders that might have escaped the HTML comments
                 result = result.replace("<p>${placeholder}</p>", "<div class='code-placeholder-wrapper' id='${placeholder}'>${placeholder}</div>")
             }
-            
+
             return result
         }
-        
+
         /**
          * Create a syntax highlighted code block component
          * @param code The code content
@@ -182,26 +184,27 @@ class MessageFormatter {
 
             // Pre-process code to handle long comments and strings better
             val processedCode = preprocessCode(code)
-            
+
             val textArea = RSyntaxTextArea(processedCode).apply {
                 syntaxEditingStyle = getSyntaxStyle(language)
                 isEditable = false
                 isCodeFoldingEnabled = true
                 antiAliasingEnabled = true
-                background = JBColor(Color(40, 44, 52), Color(40, 44, 52)) // Dark background
-                foreground = JBColor(Color(171, 178, 191), Color(171, 178, 191)) // Light text
-                caretColor = JBColor(Color(171, 178, 191), Color(171, 178, 191))
-                currentLineHighlightColor = JBColor(Color(44, 49, 58), Color(44, 49, 58))
+                // Dark theme with higher contrast for better readability
+                background = JBColor(Color(30, 30, 30), Color(25, 25, 25)) // Darker background
+                foreground = JBColor(Color(220, 220, 220), Color(230, 230, 230)) // Brighter text for better contrast
+                caretColor = JBColor(Color(220, 220, 220), Color(230, 230, 230))
+                currentLineHighlightColor = JBColor(Color(45, 45, 45), Color(40, 40, 40)) // Subtle highlight
                 font = Font(Font.MONOSPACED, Font.PLAIN, 13)
                 tabSize = 4
                 paintTabLines = true
                 marginLinePosition = 80
                 border = JBUI.Borders.empty(8)
-                
+
                 // Enhanced line wrapping settings
                 lineWrap = true
                 wrapStyleWord = false // Better for code
-                
+
                 // Use advanced line wrapping that preserves indentation
                 setWrapStyleWord(false) // Don't wrap at word boundaries, but at any character
                 setPaintTabLines(true) // Show tab guides
@@ -216,7 +219,7 @@ class MessageFormatter {
                 viewportBorder = JBUI.Borders.empty()
                 horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
                 verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED
-                
+
                 // Set height to fit all content without restriction
                 val lineCount = processedCode.lines().size
                 // Use 20 pixels per line to ensure all content is visible
@@ -224,45 +227,45 @@ class MessageFormatter {
 
                 // Set preferred size with calculated height
                 preferredSize = Dimension(messageWidth, optimalHeight)
-                
-                // Ensure gutter (line numbers area) has proper styling
-                gutter.background = JBColor(Color(30, 33, 39), Color(30, 33, 39))
-                gutter.borderColor = JBColor(Color(30, 33, 39), Color(30, 33, 39))
-                gutter.lineNumberColor = JBColor(Color(128, 128, 128), Color(128, 128, 128))
+
+                // Ensure gutter (line numbers area) has proper styling for dark theme
+                gutter.background = JBColor(Color(25, 25, 25), Color(20, 20, 20)) // Slightly darker than main background
+                gutter.borderColor = JBColor(Color(25, 25, 25), Color(20, 20, 20))
+                gutter.lineNumberColor = JBColor(Color(150, 150, 150), Color(160, 160, 160)) // Brighter line numbers
             }
 
             // Create a container with copy button
             val container = JPanel(BorderLayout()).apply {
-                border = BorderFactory.createLineBorder(JBColor.border(), 1)
-                background = JBColor(Color(40, 44, 52), Color(40, 44, 52))
+                border = BorderFactory.createLineBorder(JBColor(Color(60, 60, 60), Color(50, 50, 50)), 1) // Subtle border
+                background = JBColor(Color(30, 30, 30), Color(25, 25, 25)) // Match text area background
                 // Set maximum width to prevent code blocks from expanding too much
                 // but allow unlimited height to show all content
                 maximumSize = Dimension(JBUI.scale(600), Integer.MAX_VALUE)
                 preferredSize = Dimension(messageWidth, Integer.MAX_VALUE)
             }
             container.add(scrollPane, BorderLayout.CENTER)
-            
+
             val copyButton = JButton("Copy").apply {
                 addActionListener {
                     textArea.selectAll()
                     textArea.copy()
                     textArea.select(0, 0)
                 }
-                background = JBColor(Color(97, 175, 239), Color(97, 175, 239))
-                foreground = JBColor.BLACK
+                background = JBColor(Color(86, 156, 214), Color(86, 156, 214)) // VS Code-inspired blue
+                foreground = JBColor(Color(255, 255, 255), Color(255, 255, 255)) // White text for better contrast
                 border = BorderFactory.createEmptyBorder(3, 8, 3, 8)
                 cursor = Cursor(Cursor.HAND_CURSOR)
             }
-            
+
             val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT)).apply {
-                background = JBColor(Color(40, 44, 52), Color(40, 44, 52))
+                background = JBColor(Color(30, 30, 30), Color(25, 25, 25)) // Match container background
                 add(copyButton)
             }
             container.add(buttonPanel, BorderLayout.NORTH)
-            
+
             return container
         }
-        
+
         /**
          * Determine syntax style based on language identifier
          * @param language The programming language identifier
@@ -276,13 +279,13 @@ class MessageFormatter {
         private fun preprocessCode(code: String): String {
             val maxLineLength = 80
             val lines = code.lines().toMutableList()
-            
+
             for (i in lines.indices) {
                 val line = lines[i]
-                
+
                 // Only process lines longer than the max length
                 if (line.length <= maxLineLength) continue
-                
+
                 // More precise comment detection using regex patterns
                 val trimmedLine = line.trim()
                 val isComment = when {
@@ -299,29 +302,29 @@ class MessageFormatter {
                     // Not a comment
                     else -> false
                 }
-                
+
                 if (isComment) {
                     // Find the comment prefix more precisely
                     val prefixMatch = Regex("^(\\s*)(//|#|--|/\\*|\\*)").find(line)
                     if (prefixMatch != null) {
                         val prefix = prefixMatch.groupValues[1] // Whitespace
                         val commentPrefix = prefixMatch.groupValues[2] // Comment marker
-                        
+
                         // Calculate where the actual comment content starts
                         val contentStartIndex = prefix.length + commentPrefix.length
                         if (contentStartIndex < line.length) {
                             // Get the comment content
                             val commentContent = line.substring(contentStartIndex)
-                            
+
                             // Calculate effective max length for chunks
                             val effectiveMaxLength = maxLineLength - prefix.length - commentPrefix.length - 1
-                            
+
                             // Split the comment into chunks
                             val chunks = commentContent.chunked(effectiveMaxLength)
-                            
+
                             // Replace the original line with the first chunk
                             lines[i] = "$prefix$commentPrefix ${chunks[0]}"
-                            
+
                             // Add the remaining chunks as new lines
                             for (j in 1 until chunks.size) {
                                 lines.add(i + j, "$prefix$commentPrefix ${chunks[j]}")
@@ -330,10 +333,10 @@ class MessageFormatter {
                     }
                 }
             }
-            
+
             return lines.joinToString("\n")
         }
-        
+
         /**
          * Determine syntax style based on language identifier
          * @param language The programming language identifier

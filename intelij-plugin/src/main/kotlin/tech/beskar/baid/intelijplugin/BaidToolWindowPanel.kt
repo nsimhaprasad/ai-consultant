@@ -1104,9 +1104,8 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                                         is Block.ListBlock -> ContentRenderer.renderList(block)
                                                         is Block.Heading -> ContentRenderer.renderHeading(block)
                                                         is Block.Callout -> ContentRenderer.renderCallout(block)
-                                                        else -> null
                                                     }
-                                                    comp?.let {
+                                                    comp.let {
                                                         SwingUtilities.invokeLater {
                                                             bubbleContainer.add(it)
                                                             messagePanel.revalidate()
@@ -1134,12 +1133,12 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                             }
                                         } catch (e: Exception) {
                                             println("Error parsing block: $e")
-                                            // val comp = ContentRenderer.renderParagraph(Block.Paragraph(jsonStr))
-                                            // SwingUtilities.invokeLater {
-                                            //     bubbleContainer.add(comp)
-                                            //     messagePanel.revalidate()
-                                            //     messagePanel.repaint()
-                                            // }
+//                                             val comp = ContentRenderer.renderParagraph(Block.Paragraph("Something went wrong! Please try again"))
+//                                             SwingUtilities.invokeLater {
+//                                                 bubbleContainer.add(comp)
+//                                                 messagePanel.revalidate()
+//                                                 messagePanel.repaint()
+//                                             }
                                         }
                                     }
                                 }

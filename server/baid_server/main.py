@@ -489,6 +489,9 @@ async def consult(
                     message=message
             ):
                 for part in event.get("content", {}).get("parts", []):
+                    print("Started streaming response")
+                    print("event", event)
+                    print("part", part)
                     if "text" in part:
                         # Accumulate the chunk into our buffer
                         chunk = part["text"]
