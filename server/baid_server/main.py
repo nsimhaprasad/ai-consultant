@@ -3,6 +3,9 @@ import dotenv
 import logging
 import time
 import asyncio
+import json
+import re
+from typing import List, Dict, Any, Optional, Tuple, Union
 from typing import Optional, Dict
 from fastapi import FastAPI, Request, Header, HTTPException, Depends
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
@@ -17,6 +20,12 @@ from pydantic import BaseModel, EmailStr
 import httpx
 from threading import Timer
 from google.cloud import secretmanager
+from .prompts import RESPONSE_FORMAT
+from baid_server.utils.response_parser import ResponseParser
+from baid_server.core.models import (
+    Block, ParagraphBlock, HeadingBlock, ListBlock, CodeBlock,
+    CommandBlock, CalloutBlock, ListItem, JetbrainsResponse
+)
 
 # Enhanced logging configuration
 logging.basicConfig(
@@ -459,87 +468,38 @@ async def consult(
     # Choose streaming mode based on configuration
     async def generate_streaming_response():
         full_response = ""
-
+        json_buffer = ""
+        
         try:
-            if ENABLE_WORD_BY_WORD_STREAMING:
-                # Word-by-word streaming
-                chunk_buffer = ""
-                word_count = 0
-
-                if is_open:
-                    message = f"{user_input}\n\nFile content: {file_content}" + "\n" + user_input
-                else:
-                    message = user_input
-
-                for event in agent.stream_query(
-                        user_id=user_id,
-                        session_id=session_id,
-                        message=message
-                ):
-                    for part in event.get("content", {}).get("parts", []):
-                        if "text" in part:
-                            chunk = part["text"]
-                            chunk_buffer += chunk
-
-                            # Split by spaces to get words
-                            words = chunk_buffer.split()
-
-                            # Process complete words (all except potentially incomplete last word)
-                            for i, word in enumerate(words):
-                                # Skip processing the last word if buffer doesn't end with space
-                                # This avoids the duplicate word issue
-                                if i == len(words) - 1 and not chunk_buffer.endswith(' '):
-                                    # Keep the potentially incomplete word in buffer
-                                    chunk_buffer = word
-                                    break
-
-                                word_count += 1
-                                full_response += word + " "
-
-                                # Send word as SSE
-                                word_with_space = word + " "
-                                sse_data = f"data: {word_with_space}\n\n"
-                                yield sse_data
-
-                                # Variable delay based on word length
-                                if len(word) > 8:
-                                    word_delay = 0.2
-                                elif len(word) > 4:
-                                    word_delay = 0.15
-                                else:
-                                    word_delay = 0.1
-
-                                # Pause longer at sentence boundaries
-                                if any(char in word for char in '.!?'):
-                                    word_delay = 0.4
-
-                                await asyncio.sleep(word_delay)
-
-                            # If buffer ends with space, we've processed all words
-                            if chunk_buffer.endswith(' '):
-                                chunk_buffer = ""
-
-                # Process any remaining text in buffer
-                if chunk_buffer:
-                    full_response += chunk_buffer + " "
-                    sse_data = f"data: {chunk_buffer} \n\n"
-                    yield sse_data
-                    await asyncio.sleep(0.1)
-
+            # Prepare message with format instructions
+            if is_open:
+                message = f"{user_input}\n\nFile content: {file_content}" + "\n" + user_input
             else:
-                # Chunk-based streaming (original behavior)
-                for event in agent.stream_query(
-                        user_id=user_id,
-                        session_id=session_id,
-                        message=user_input
-                ):
-                    for part in event.get("content", {}).get("parts", []):
-                        if "text" in part:
-                            chunk = part["text"]
-                            full_response += chunk
-                            sse_data = f"data: {chunk}\n\n"
+                message = user_input
+
+            message = message + "\n\n" + f"""
+            Your response should follow the JSON format specified strictly.
+            {RESPONSE_FORMAT}
+            """
+
+            # Stream response from agent
+            for event in agent.stream_query(
+                    user_id=user_id,
+                    session_id=session_id,
+                    message=message
+            ):
+                for part in event.get("content", {}).get("parts", []):
+                    if "text" in part:
+                        # Accumulate the chunk into our buffer
+                        chunk = part["text"]
+                        json_buffer += chunk
+                        full_response += chunk
+                        
+                        # Process chunks as they come in
+                        sse_data = await ResponseParser.process_incoming_chunk(chunk, json_buffer)
+                        if sse_data:
                             yield sse_data
-                            await asyncio.sleep(0.01)
+                            await asyncio.sleep(0.05)
 
             # Send session_id and final marker
             session_data = f"data: {{\"session_id\": \"{session_id}\"}}\n\n"

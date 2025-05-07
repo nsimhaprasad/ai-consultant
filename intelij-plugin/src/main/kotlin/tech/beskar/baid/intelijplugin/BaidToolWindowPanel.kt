@@ -20,6 +20,9 @@ import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
 import tech.beskar.baid.intelijplugin.auth.LoginPanel
 import tech.beskar.baid.intelijplugin.config.BaidConfiguration
+import tech.beskar.baid.intelijplugin.model.Block
+import tech.beskar.baid.intelijplugin.model.ContentParser
+import tech.beskar.baid.intelijplugin.ui.ContentRenderer
 import tech.beskar.baid.intelijplugin.util.FontUtil
 import tech.beskar.baid.intelijplugin.util.getMessageWidth
 import java.awt.*
@@ -90,6 +93,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             println("Error updating bubble width: ${e.message}")
         }
     }
+
     private val chatPanel = JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(8)))
     private val chatScroll = JBScrollPane(chatPanel)
     private val inputField = JBTextField(30)
@@ -602,7 +606,10 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                     }
 
                     // Add a separator to indicate where the new messages will start
-                    appendMessage("Continuing this conversation. Any new messages will be part of this session.", isUser = false)
+                    appendMessage(
+                        "Continuing this conversation. Any new messages will be part of this session.",
+                        isUser = false
+                    )
                 }
             } catch (e: Exception) {
                 SwingUtilities.invokeLater {
@@ -895,10 +902,10 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
             // Scroll to bottom
             SwingUtilities.invokeLater {
-                val vertical = chatScroll.verticalScrollBar
-                vertical.value = vertical.maximum
-            }
+            val vertical = chatScroll.verticalScrollBar
+            vertical.value = vertical.maximum
         }
+    }
     }
 
     fun consultWithAPI(userPrompt: String) {
@@ -1026,48 +1033,31 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                 }
 
                                 // Create agent message with WhatsApp-like layout
-                                val bubbleContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                                val bubbleContainer = JBPanel<JBPanel<*>>(VerticalLayout(8)).apply {
                                     background = JBColor(Color(255, 255, 255), Color(60, 63, 65))
                                     border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
                                 }
 
-                                // Create message text area
-                                val messageText = JTextPane().apply {
-                                    contentType = "text/html"
-                                    val messageWidth = getMessageWidth()
-                                    text = "<html><head><style>body {$HTML_WRAPPER_STYLE width: ${messageWidth}px; max-width: ${messageWidth}px;}</style></head><body></body></html>"
-                                    font = FontUtil.getBodyFont()
-                                    isEditable = false
-                                    isOpaque = false
-                                    background = Color(0, 0, 0, 0)
-                                    foreground = JBColor.foreground()
-                                    border = JBUI.Borders.empty()
-
-                                    // Simple maximum width constraint
-                                    maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
-                                }
-
-                                bubbleContainer.add(messageText, BorderLayout.CENTER)
-
-                                // Create message with avatar container for agent response
+                                // Initialize empty container for structured content blocks
                                 val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
                                     isOpaque = false
-
-                                    val avatarLabel = JLabel().apply {
-                                        icon = AllIcons.General.BalloonInformation
-                                        border = JBUI.Borders.emptyRight(JBUI.scale(8))
-                                        verticalAlignment = JLabel.TOP
-                                    }
-                                    add(avatarLabel, BorderLayout.WEST)
-                                    add(bubbleContainer, BorderLayout.CENTER)
-
-                                    // Add padding on the right
-                                    val spacer = JPanel().apply {
-                                        isOpaque = false
-                                        preferredSize = Dimension(JBUI.scale(100), 0)
-                                    }
-                                    add(spacer, BorderLayout.EAST)
                                 }
+
+                                // Create message with avatar container for agent response
+                                val avatarLabel = JLabel().apply {
+                                    icon = AllIcons.General.BalloonInformation
+                                    border = JBUI.Borders.emptyRight(JBUI.scale(8))
+                                    verticalAlignment = JLabel.TOP
+                                }
+                                contentPanel.add(avatarLabel, BorderLayout.WEST)
+                                contentPanel.add(bubbleContainer, BorderLayout.CENTER)
+
+                                // Add padding on the right
+                                val spacer = JPanel().apply {
+                                    isOpaque = false
+                                    preferredSize = Dimension(JBUI.scale(100), 0)
+                                }
+                                contentPanel.add(spacer, BorderLayout.EAST)
 
                                 messagePanel.add(contentPanel, BorderLayout.CENTER)
 
@@ -1079,30 +1069,77 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                 }
 
                                 request.inputStream.bufferedReader().use { reader ->
-                                    var line: String?
-                                    while (reader.readLine().also { line = it } != null) {
+                                    while (true) {
+                                        val rawLine = reader.readLine() ?: break
                                         lineCount++
+                                        println("[STREAM] line: $rawLine")
+                                        if (!rawLine.startsWith("data: ")) continue
+                                        val data = rawLine.substringAfter("data: ").trim()
+                                        println("[STREAM] data: $data")
+                                        if (data == "[DONE]") break
 
-                                        if (line?.startsWith("data: ") == true) {
-                                            val data = line?.substring(6) ?: ""
+                                        // Accumulate JSON block, handling multi-line objects
+                                        val sb = StringBuilder().append(data)
+                                        var braceCount = data.count { it == '{' } - data.count { it == '}' }
+                                        while (braceCount > 0) {
+                                            val nextLine = reader.readLine() ?: break
+                                            println("[STREAM] continuation: $nextLine")
+                                            sb.append(nextLine)
+                                            braceCount += nextLine.count { it == '{' } - nextLine.count { it == '}' }
+                                        }
+                                        val jsonStr = sb.toString()
+                                        println("[STREAM] complete JSON: $jsonStr")
 
-                                            if (data == "[DONE]") {
-                                                break
-                                            } else if (data.startsWith("{") && data.endsWith("}")) {
-                                                try {
-                                                    val jsonData = JSONObject(data)
-                                                    val sessionIdInJson = jsonData.optString("session_id", null)
-                                                    if (sessionIdInJson != null && sessionIdInJson.isNotEmpty()) {
-                                                        updatedSessionId = sessionIdInJson
+                                        // Parse and render the block
+                                        try {
+                                            val jsonObj = JSONObject(jsonStr)
+                                            if (jsonObj.has("blocks")) {
+                                                val response = ContentParser.parseResponse(jsonStr)
+                                                response.blocks.forEach { block ->
+                                                    println("[STREAM] parsed block: $block")
+                                                    val comp = when (block) {
+                                                        is Block.Paragraph -> ContentRenderer.renderParagraph(block)
+                                                        is Block.Code -> ContentRenderer.renderCode(block)
+                                                        is Block.Command -> ContentRenderer.renderCommand(block)
+                                                        is Block.ListBlock -> ContentRenderer.renderList(block)
+                                                        is Block.Heading -> ContentRenderer.renderHeading(block)
+                                                        is Block.Callout -> ContentRenderer.renderCallout(block)
+                                                        else -> null
                                                     }
-                                                } catch (e: Exception) {
-                                                    fullResponse += data
-                                                    updateMessagePanel(messagePanel, fullResponse)
+                                                    comp?.let {
+                                                        SwingUtilities.invokeLater {
+                                                            bubbleContainer.add(it)
+                                                            messagePanel.revalidate()
+                                                            messagePanel.repaint()
+                                                        }
+                                                    }
                                                 }
                                             } else {
-                                                fullResponse += data
-                                                updateMessagePanel(messagePanel, fullResponse)
+                                                val block = ContentParser.parseBlock(jsonObj)
+                                                val comp = when (block) {
+                                                    is Block.Paragraph -> ContentRenderer.renderParagraph(block)
+                                                    is Block.Code -> ContentRenderer.renderCode(block)
+                                                    is Block.Command -> ContentRenderer.renderCommand(block)
+                                                    is Block.ListBlock -> ContentRenderer.renderList(block)
+                                                    is Block.Heading -> ContentRenderer.renderHeading(block)
+                                                    else -> null
+                                                }
+                                                comp?.let {
+                                                    SwingUtilities.invokeLater {
+                                                        bubbleContainer.add(it)
+                                                        messagePanel.revalidate()
+                                                        messagePanel.repaint()
+                                                    }
+                                                }
                                             }
+                                        } catch (e: Exception) {
+                                            println("Error parsing block: $e")
+                                            // val comp = ContentRenderer.renderParagraph(Block.Paragraph(jsonStr))
+                                            // SwingUtilities.invokeLater {
+                                            //     bubbleContainer.add(comp)
+                                            //     messagePanel.revalidate()
+                                            //     messagePanel.repaint()
+                                            // }
                                         }
                                     }
                                 }
@@ -1138,111 +1175,6 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 }
             }
         )
-    }
-
-
-    private fun updateMessagePanel(messagePanel: JBPanel<*>, text: String) {
-        val options = MutableDataSet()
-        val parser = Parser.builder(options).build()
-        val htmlrenderer = HtmlRenderer.builder(options).build()
-
-        // Use MessageFormatter to process the message and extract code blocks
-        val messageWidth = getMessageWidth()
-        val (wrappedHtml, codeBlocks) = MessageFormatter.processMessage(text, messageWidth)
-        
-        // Extract the HTML body content from the wrapped HTML
-        val bodyStartIndex = wrappedHtml.indexOf("<body>") + 6
-        val bodyEndIndex = wrappedHtml.indexOf("</body>")
-        var html = if (bodyStartIndex > 5 && bodyEndIndex > bodyStartIndex) {
-            wrappedHtml.substring(bodyStartIndex, bodyEndIndex)
-        } else {
-            wrappedHtml
-        }
-
-        SwingUtilities.invokeLater {
-            try {
-                val contentPanel = messagePanel.getComponent(0) as JBPanel<*>
-                val bubbleContainer = contentPanel.getComponent(1) as JBPanel<*>
-                
-                // Clear existing components from the bubble container
-                bubbleContainer.removeAll()
-                
-                // Create a panel with BorderLayout to hold the message content
-                val messageContentPanel = JBPanel<JBPanel<*>>(BorderLayout())
-                messageContentPanel.isOpaque = false
-                
-                // Create HTML pane for regular text
-                val messageText = JTextPane().apply {
-                    contentType = "text/html"
-                    isEditable = false
-                    isOpaque = false
-                    background = Color(0, 0, 0, 0) // Transparent
-                    foreground = JBColor.foreground()
-                    border = JBUI.Borders.empty()
-                }
-                val messageWidth = getMessageWidth()
-                
-                // If there are code blocks, process them before setting the HTML
-                if (codeBlocks.isNotEmpty()) {
-                    val codeBlocksPanel = JBPanel<JBPanel<*>>(VerticalLayout(8))
-                    codeBlocksPanel.isOpaque = false
-                    
-                    // Create all code block components
-                    val codeComponentMap = mutableMapOf<String, JComponent>()
-                    for ((placeholder, language, code) in codeBlocks) {
-                        // Create a syntax highlighted code block for each code block
-                        val codeBlockComponent = MessageFormatter.createCodeBlock(code, language)
-                        codeComponentMap[placeholder] = codeBlockComponent
-                    }
-                    
-                    // Process all code blocks in the HTML
-                    for ((placeholder, _, _) in codeBlocks) {
-                        // Look for the placeholder wrapper pattern
-                        val wrapperPattern = "<div class='code-placeholder-wrapper' id='${placeholder}'>${placeholder}</div>"
-                        if (html.contains(wrapperPattern)) {
-                            // Add the corresponding code component to the panel
-                            codeComponentMap[placeholder]?.let { codeBlocksPanel.add(it) }
-                            
-                            // Replace the wrapper with an empty string to remove it from the HTML
-                            html = html.replace(wrapperPattern, "")
-                        }
-                    }
-                    
-                    // Add the code blocks panel after setting up all components
-                    messageContentPanel.add(codeBlocksPanel, BorderLayout.CENTER)
-                }
-                
-                // Set the HTML text AFTER processing all placeholders
-                messageText.text = """<html>
-                        <head>
-                            <style>
-                                body {$HTML_WRAPPER_STYLE width: ${messageWidth}px; max-width: ${messageWidth}px;}
-                            </style>
-                        </head>
-                        <body>$html</body>
-                    </html>""".trimIndent()
-                
-                // Add the HTML pane to the content panel
-                messageContentPanel.add(messageText, BorderLayout.NORTH)
-                
-                // Add the content panel to the bubble container
-                bubbleContainer.add(messageContentPanel, BorderLayout.CENTER)
-
-                // Scroll to bottom
-                val vertical = chatScroll.verticalScrollBar
-                vertical.value = vertical.maximum
-
-                // Refresh UI
-                bubbleContainer.revalidate()
-                bubbleContainer.repaint()
-                messagePanel.revalidate()
-                messagePanel.repaint()
-                chatPanel.revalidate()
-                chatPanel.repaint()
-            } catch (e: Exception) {
-                println("Error updating message panel: ${e.message}")
-            }
-        }
     }
 
     private fun removeLastMessageIfThinking() {
