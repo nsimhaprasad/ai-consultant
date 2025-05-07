@@ -250,6 +250,7 @@ jobs:
             "GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}"
             "GOOGLE_CLIENT_SECRET=${{ vars.GOOGLE_CLIENT_SECRET }}"
             "JWT_SECRET=${{ secrets.JWT_SECRET }}"
+            "RECAPTCHA_SECRET_KEY=${{ secrets.RECAPTCHA_SECRET_KEY }}"
             "PROJECT_ID=${{ vars.PROJECT_ID }}"
             "GOOGLE_REDIRECT_URI=${{ vars.BAID_REDIRECT_URI }}"
             "ENABLE_WORD_BY_WORD_STREAMING=true"

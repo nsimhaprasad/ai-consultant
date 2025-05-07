@@ -433,7 +433,6 @@ async def consult(
     file_path = context.get("file_path", "")
     file_name = context.get("file_name", "")
     is_open = context.get("is_open", False)
-    
 
     # Get the agent
     try:
@@ -668,10 +667,11 @@ app.add_middleware(
 
 
 class WaitlistRequest(BaseModel):
-    email: EmailStr  
+    email: EmailStr
     name: str = None
     role: str = None
     referral_source: str = None
+    captcha: str
 
 
 @app.post("/api/waitlist")
@@ -682,6 +682,44 @@ async def register_waitlist(request: Request, waitlist_req: WaitlistRequest):
     # Get the client's IP address
     client_ip = request.client.host
     logger.info(f"[{request_id}] Client IP: {client_ip}")
+
+    # Verify reCAPTCHA token
+    if not waitlist_req.captcha:
+        logger.warning(f"[{request_id}] Missing captcha token for: {waitlist_req.email}")
+        raise HTTPException(status_code=400, detail="Captcha verification failed")
+
+    # Verify with Google reCAPTCHA API
+    recaptcha_secret = os.environ.get("RECAPTCHA_SECRET_KEY")  # Store in environment variable
+    if not recaptcha_secret:
+        logger.error(f"[{request_id}] RECAPTCHA_SECRET_KEY not configured")
+        raise HTTPException(status_code=500, detail="Server configuration error")
+
+    try:
+        recaptcha_response = requests.post(
+            "https://www.google.com/recaptcha/api/siteverify",
+            data={
+                "secret": recaptcha_secret,
+                "response": waitlist_req.captcha,
+                "remoteip": client_ip
+            }
+        ).json()
+
+        if not recaptcha_response.get("success", False):
+            logger.warning(
+                f"[{request_id}] reCAPTCHA verification failed for: {waitlist_req.email}. Error: {recaptcha_response.get('error-codes')}")
+            raise HTTPException(status_code=400, detail="Captcha verification failed")
+
+        # Optional: Check score for reCAPTCHA v3
+        score = recaptcha_response.get("score", 0)
+        if score < 0.5:  # Adjust threshold as needed
+            logger.warning(f"[{request_id}] Low reCAPTCHA score ({score}) for: {waitlist_req.email}")
+            raise HTTPException(status_code=400, detail="Captcha verification failed")
+
+        logger.info(f"[{request_id}] reCAPTCHA verification successful for: {waitlist_req.email}, score: {score}")
+
+    except Exception as e:
+        logger.error(f"[{request_id}] Error verifying reCAPTCHA: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to verify captcha")
 
     try:
         pool = await get_db_pool()
