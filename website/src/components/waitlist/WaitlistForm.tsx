@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, AlertCircle } from 'lucide-react';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 interface WaitlistFormProps {
   title?: string;
@@ -11,49 +12,106 @@ const WaitlistForm: React.FC<WaitlistFormProps> = ({
   title = "Join the Waitlist",
   subtitle = "Be the first to get access to our agent."
 }) => {
-  const [email, setEmail] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    role: ''
+  });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [captchaValue, setCaptchaValue] = useState<string | null>(null);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    if (status === 'error') setStatus('idle');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email) {
+    // Validate form fields
+    if (!formData.name) {
+      setStatus('error');
+      setErrorMessage('Please enter your name');
+      return;
+    }
+
+    if (!formData.email) {
       setStatus('error');
       setErrorMessage('Please enter your email address');
       return;
     }
 
+    if (!formData.role) {
+      setStatus('error');
+      setErrorMessage('Please select your role');
+      return;
+    }
+
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(formData.email)) {
       setStatus('error');
       setErrorMessage('Please enter a valid email address');
+      return;
+    }
+
+    // Validate reCAPTCHA
+    if (!captchaValue) {
+      setStatus('error');
+      setErrorMessage('Please complete the reCAPTCHA verification');
       return;
     }
 
     setStatus('loading');
 
     try {
-      // In a real implementation, you would send this to your backend API
-      // which would then store it in a Google Sheets document
+      // Make POST request to core.baid.dev/waitlist with form data
+      const response = await fetch('https://core.baid.dev/waitlist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          captcha: captchaValue
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
       
-      // Simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Simulate successful submission
+      // Successful submission
       setStatus('success');
-      setEmail('');
+      setFormData({
+        name: '',
+        email: '',
+        role: ''
+      });
+      setCaptchaValue(null);
       
       // Reset success state after 3 seconds
       setTimeout(() => {
         setStatus('idle');
       }, 3000);
     } catch (error) {
-      console.error('Error submitting email:', error);
+      console.error('Error submitting form:', error);
       setStatus('error');
       setErrorMessage('Something went wrong. Please try again.');
     }
+  };
+
+  const handleCaptchaChange = (value: string | null) => {
+    setCaptchaValue(value);
+    if (status === 'error') setStatus('idle');
   };
 
   return (
@@ -64,6 +122,24 @@ const WaitlistForm: React.FC<WaitlistFormProps> = ({
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Name Field */}
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-surface-300 mb-1">
+            Full Name
+          </label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            placeholder="John Doe"
+            className="input"
+            disabled={status === 'loading' || status === 'success'}
+          />
+        </div>
+
+        {/* Email Field */}
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-surface-300 mb-1">
             Email Address
@@ -71,28 +147,61 @@ const WaitlistForm: React.FC<WaitlistFormProps> = ({
           <input
             type="email"
             id="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              if (status === 'error') setStatus('idle');
-            }}
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
             placeholder="you@example.com"
             className="input"
             disabled={status === 'loading' || status === 'success'}
           />
-          
-          {/* Error Message */}
-          {status === 'error' && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-2 flex items-center text-error-500 text-sm"
-            >
-              <AlertCircle className="h-4 w-4 mr-1" />
-              {errorMessage}
-            </motion.div>
-          )}
         </div>
+
+        {/* Role Field */}
+        <div>
+          <label htmlFor="role" className="block text-sm font-medium text-surface-300 mb-1">
+            Your Role
+          </label>
+          <select
+            id="role"
+            name="role"
+            value={formData.role}
+            onChange={handleInputChange}
+            className="input"
+            disabled={status === 'loading' || status === 'success'}
+          >
+            <option value="" disabled>Select your role</option>
+            <option value="developer">Developer</option>
+            <option value="designer">Designer</option>
+            <option value="product_manager">Product Manager</option>
+            <option value="engineering_manager">Engineering Manager</option>
+            <option value="executive">Executive</option>
+            <option value="student">Student</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        
+        {/* reCAPTCHA */}
+        {/* Local: 6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI */}
+        {/* Production: 6LeKlzErAAAAALxy5KTqLGq7xqBTf5YM996xm1Y0 */}
+        <div className="flex justify-center my-4">
+          <ReCAPTCHA
+            sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+            onChange={handleCaptchaChange}
+            theme="dark"
+          />
+        </div>
+          
+        {/* Error Message */}
+        {status === 'error' && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-2 flex items-center text-error-500 text-sm"
+          >
+            <AlertCircle className="h-4 w-4 mr-1" />
+            {errorMessage}
+          </motion.div>
+        )}
         
         <button
           type="submit"
@@ -124,7 +233,7 @@ const WaitlistForm: React.FC<WaitlistFormProps> = ({
         </button>
         
         <p className="text-xs text-surface-400 text-center mt-4">
-          We'll never share your email with anyone else.
+          We'll never share your information with anyone else.
         </p>
       </form>
     </div>
