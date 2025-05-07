@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -12,8 +12,7 @@ const Footer: React.FC = () => {
           {/* Logo and company description */}
           <div className="col-span-1 md:col-span-1">
             <Link to="/" className="flex items-center space-x-2 text-white mb-4">
-              <Bot className="h-8 w-8 text-primary-500" />
-              <span className="text-2xl font-black">baid</span>
+              <img src="/images/logo-hr.svg" alt="baid logo" className="h-8" />
             </Link>
             <p className="text-surface-400 mb-4">
               A clean coding agent that helps you realize your ideas, available in hosted and on-premise versions.

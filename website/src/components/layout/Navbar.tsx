@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, X, Bot } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar: React.FC = () => {
@@ -32,8 +32,7 @@ const Navbar: React.FC = () => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 text-white">
-            <Bot className="h-8 w-8 text-primary-500" />
-            <span className="text-xl font-black">baid</span>
+            <img src="/images/logo-hr.svg" alt="baid logo" className="h-8" />
           </Link>
 
           {/* Desktop Navigation */}
