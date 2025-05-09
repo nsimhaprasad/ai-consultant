@@ -11,8 +11,10 @@ NC='\033[0m' # No Color
 
 # Default installation directory
 INSTALL_DIR="/usr/local/bin"
-DEFAULT_VERSION="latest"
+DEFAULT_VERSION="baid-ci/v0.1.0"
 VERSION="$DEFAULT_VERSION"
+REPO_URL="https://github.com/nsimhaprasad/ai-consultant"
+LATEST_CHECK_URL="https://api.github.com/repos/nsimhaprasad/ai-consultant/releases/latest"
 
 print_header() {
     echo -e "${BLUE}============================================${NC}"
@@ -24,7 +26,7 @@ print_header() {
 print_usage() {
     echo -e "Usage: $0 [OPTIONS]"
     echo -e "Options:"
-    echo -e "  -v, --version VERSION    Specify version to install (default: latest)"
+    echo -e "  -v, --version VERSION    Specify version to install (default: $DEFAULT_VERSION)"
     echo -e "  -d, --dir DIRECTORY      Specify installation directory (default: /usr/local/bin)"
     echo -e "  -h, --help               Display this help message"
     echo
@@ -55,6 +57,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 print_header
+
+# Check for curl
+if ! command -v curl &> /dev/null; then
+    echo -e "${RED}Error: curl is required for installation${NC}"
+    exit 1
+fi
 
 # Determine OS and architecture
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -98,16 +106,12 @@ fi
 
 echo -e "${BLUE}Detected platform:${NC} $PLATFORM-$ARCHITECTURE"
 
-# Determine the download URL
+# Get latest version if specified
 if [ "$VERSION" = "latest" ]; then
     echo -e "${BLUE}Fetching latest release information...${NC}"
-    if ! command -v curl &> /dev/null; then
-        echo -e "${RED}Error: curl is required for installation${NC}"
-        exit 1
-    fi
 
     # Get the latest release tag from GitHub API
-    LATEST_RELEASE=$(curl -s https://api.github.com/repos/beskar-ai/baid-ci/releases/latest)
+    LATEST_RELEASE=$(curl -s "$LATEST_CHECK_URL")
     if [ -z "$LATEST_RELEASE" ]; then
         echo -e "${RED}Error: Failed to fetch latest release information${NC}"
         exit 1
@@ -116,16 +120,18 @@ if [ "$VERSION" = "latest" ]; then
     VERSION=$(echo "$LATEST_RELEASE" | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
     if [ -z "$VERSION" ]; then
         echo -e "${RED}Error: Failed to determine latest version${NC}"
-        exit 1
+        echo -e "${YELLOW}Using default version: $DEFAULT_VERSION${NC}"
+        VERSION="$DEFAULT_VERSION"
+    else
+        echo -e "${GREEN}Latest version: $VERSION${NC}"
     fi
-    echo -e "${GREEN}Latest version: $VERSION${NC}"
 fi
 
-# Construct the download URL (adjust according to your GitHub release structure)
+# Construct the download URL
 FILENAME="baid-ci-$PLATFORM-$ARCHITECTURE$EXT"
-DOWNLOAD_URL="https://github.com/nsimhaprasad/ai-consultant/releases/download/$VERSION/$FILENAME"
+DOWNLOAD_URL="$REPO_URL/releases/download/$VERSION/$FILENAME"
 
-echo -e "${BLUE}Downloading BAID-CI $VERSION for $PLATFORM-$ARCHITECTURE...${NC}"
+echo -e "${BLUE}Downloading BAID-CI ($VERSION) for $PLATFORM-$ARCHITECTURE...${NC}"
 echo -e "${BLUE}Download URL: $DOWNLOAD_URL${NC}"
 
 # Create a temporary directory
@@ -134,11 +140,12 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 # Download the binary
 if ! curl -L -o "$TMP_DIR/$FILENAME" "$DOWNLOAD_URL"; then
-    echo -e "${RED}Error: Failed to download BAID-CI${NC}"
+    echo -e "${RED}Error: Failed to download BAID-CI binary${NC}"
+    echo -e "${RED}The requested binary may not be available for your platform.${NC}"
     exit 1
 fi
 
-# Make the binary executable (not needed for Windows)
+# Make the binary executable
 if [ "$PLATFORM" != "windows" ]; then
     chmod +x "$TMP_DIR/$FILENAME"
 fi
@@ -148,7 +155,7 @@ if [ ! -d "$INSTALL_DIR" ]; then
     echo -e "${YELLOW}Creating installation directory: $INSTALL_DIR${NC}"
     if ! mkdir -p "$INSTALL_DIR"; then
         echo -e "${RED}Error: Failed to create installation directory${NC}"
-        echo -e "${YELLOW}Try running with sudo:${NC} sudo $0 $*"
+        echo -e "${YELLOW}Try running with sudo:${NC} sudo bash -c \"$(curl -fsSL $REPO_URL/releases/download/$VERSION/install.sh)\""
         exit 1
     fi
 fi
@@ -157,7 +164,7 @@ fi
 echo -e "${BLUE}Installing to $INSTALL_DIR/baid-ci$EXT...${NC}"
 if ! mv "$TMP_DIR/$FILENAME" "$INSTALL_DIR/baid-ci$EXT"; then
     echo -e "${RED}Error: Failed to install BAID-CI${NC}"
-    echo -e "${YELLOW}Try running with sudo:${NC} sudo $0 $*"
+    echo -e "${YELLOW}Try running with sudo:${NC} sudo bash -c \"$(curl -fsSL $REPO_URL/releases/download/$VERSION/install.sh)\""
     exit 1
 fi
 
@@ -167,7 +174,22 @@ echo -e "${GREEN}You can now run it with:${NC} baid-ci"
 # Check if the installation directory is in PATH
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo -e "${YELLOW}Warning: $INSTALL_DIR is not in your PATH${NC}"
-    echo -e "You may need to add it to your PATH or use the full path to run BAID-CI."
+
+    # Suggest appropriate command to add to PATH based on shell
+    SHELL_NAME=$(basename "$SHELL")
+    case "$SHELL_NAME" in
+        bash)
+            echo -e "Run this command to add it to your PATH:${NC}"
+            echo -e "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.bashrc && source ~/.bashrc"
+            ;;
+        zsh)
+            echo -e "Run this command to add it to your PATH:${NC}"
+            echo -e "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.zshrc && source ~/.zshrc"
+            ;;
+        *)
+            echo -e "Add $INSTALL_DIR to your PATH to run baid-ci without specifying the full path."
+            ;;
+    esac
 fi
 
 echo

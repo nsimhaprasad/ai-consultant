@@ -94,6 +94,23 @@ jobs:
         path: baid-ci/build/baid-ci-macos-x86_64
         retention-days: 5
 
+  prepare-install-script:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Prepare install script
+      run: |
+        mkdir -p dist
+        cp baid-ci/install.sh dist/
+        # Make the script executable
+        chmod +x dist/install.sh
+    - name: Upload install script
+      uses: actions/upload-artifact@v4
+      with:
+        name: install-script
+        path: dist/install.sh
+        retention-days: 5
+
   pypi-publish:
     needs: build-package
     # Only run for tags starting with baid-ci/v (e.g. baid-ci/v0.1.0)
@@ -117,7 +134,7 @@ jobs:
         verbose: true
 
   create-release:
-    needs: [build-linux-x86_64, build-macos]
+    needs: [build-linux-x86_64, build-macos, prepare-install-script]
     # Only run for tags starting with baid-ci/v (e.g. baid-ci/v0.1.0)
     if: startsWith(github.ref, 'refs/tags/baid-ci/v')
     # Need to use permissions for the job
@@ -141,12 +158,17 @@ jobs:
       with:
         name: macos-x86_64-executable
         path: dist/
+    - name: Download install script
+      uses: actions/download-artifact@v4
+      with:
+        name: install-script
+        path: dist/
     - name: Create release
       uses: ncipollo/release-action@v1
       with:
         name: BAID-CI v${{ steps.get_version.outputs.VERSION }}
         tag: ${{ github.ref_name }}
-        artifacts: "dist/baid-ci-linux-x86_64,dist/baid-ci-macos-x86_64"
+        artifacts: "dist/baid-ci-linux-x86_64,dist/baid-ci-macos-x86_64,dist/install.sh"
         draft: false
         prerelease: false
         generateReleaseNotes: true
