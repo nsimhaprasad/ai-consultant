@@ -339,3 +339,51 @@ resource "google_project_iam_member" "secret_accessor" {
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
+
+# Create a public GCS bucket for BAID-CI releases
+resource "google_storage_bucket" "baid_ci_releases" {
+  name          = "baid-ci-releases"
+  location      = var.region
+  force_destroy = true
+
+  # Configure public access
+  uniform_bucket_level_access = false  # Enable ACLs
+
+  # Lifecycle rules to manage old versions
+  lifecycle_rule {
+    condition {
+      age = 365  # Keep objects for 1 year
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
+  # Enable versioning to keep track of binary history
+  versioning {
+    enabled = true
+  }
+
+  # Set CORS policy for direct browser downloads
+  cors {
+    origin          = ["*"]
+    method          = ["GET", "HEAD", "OPTIONS"]
+    response_header = ["Content-Type", "Content-Length", "Content-Disposition"]
+    max_age_seconds = 3600
+  }
+
+  # Set default object ACL to public-read
+  website {
+    main_page_suffix = "index.html"
+    not_found_page   = "404.html"
+  }
+}
+
+# Grant public read access to the bucket's objects
+resource "google_storage_bucket_iam_binding" "public_read" {
+  bucket = google_storage_bucket.baid_ci_releases.name
+  role   = "roles/storage.objectViewer"
+  members = [
+    "allUsers",
+  ]
+}
