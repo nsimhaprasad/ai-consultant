@@ -27,12 +27,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r baid-ci/requirements-dev.txt
     - name: Lint with flake8
+      working-directory: baid-ci
       run: |
         flake8 baid_ci tests
     - name: Type check with mypy
+      working-directory: baid-ci
       run: |
         mypy baid_ci
     - name: Test with pytest
+      working-directory: baid-ci
       run: |
         pytest
 
@@ -51,13 +54,14 @@ jobs:
         pip install build wheel
         pip install -r baid-ci/requirements-dev.txt
     - name: Create packages
+      working-directory: baid-ci
       run: |
         python -m build
     - name: Upload Python packages
       uses: actions/upload-artifact@v4
       with:
         name: python-packages
-        path: dist/
+        path: baid-ci/dist/
         retention-days: 5
 
   build-linux-x86_64:
@@ -75,13 +79,14 @@ jobs:
         pip install -r baid-ci/requirements.txt
         pip install nuitka ordered-set pytest-runner patchelf
     - name: Build executable
+      working-directory: baid-ci
       run: |
-        python baid-ci/scripts/build_executables.py linux-x86_64
+        python scripts/build_executables.py linux-x86_64
     - name: Upload Linux executable
       uses: actions/upload-artifact@v4
       with:
         name: linux-x86_64-executable
-        path: build/baid-ci-linux-x86_64
+        path: baid-ci/build/baid-ci-linux-x86_64
         retention-days: 5
 
   build-macos:
@@ -99,13 +104,14 @@ jobs:
         pip install -r baid-ci/requirements.txt
         pip install nuitka ordered-set pytest-runner
     - name: Build executable
+      working-directory: baid-ci
       run: |
-        python baid-ci/scripts/build_executables.py macos-x86_64
+        python scripts/build_executables.py macos-x86_64
     - name: Upload macOS executable
       uses: actions/upload-artifact@v4
       with:
         name: macos-x86_64-executable
-        path: build/baid-ci-macos-x86_64
+        path: baid-ci/build/baid-ci-macos-x86_64
         retention-days: 5
 
   build-windows:
@@ -123,13 +129,14 @@ jobs:
         pip install -r baid-ci/requirements.txt
         pip install nuitka ordered-set pytest-runner
     - name: Build executable
+      working-directory: baid-ci
       run: |
-        python baid-ci\scripts\build_executables.py windows-x86_64
+        python scripts\build_executables.py windows-x86_64
     - name: Upload Windows executable
       uses: actions/upload-artifact@v4
       with:
         name: windows-x86_64-executable
-        path: build/baid-ci-windows-x86_64.exe
+        path: baid-ci/build/baid-ci-windows-x86_64.exe
         retention-days: 5
 
   pypi-publish:
