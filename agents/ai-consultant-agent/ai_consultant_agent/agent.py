@@ -1,6 +1,7 @@
 import os
 import json
 from google.adk import Agent
+from .prompts import TDD_PROMPT, SOLID_PRINCIPLES_PROMPT, CODE_REVIEW_BEST_PRACTICES, CLEAN_CODE_PROMPT, REFACTORING_BEST_PRACTICES
 from typing import List, Optional
 
 
@@ -8,11 +9,11 @@ from typing import List, Optional
 def get_development_principles() -> str:
     """Returns a list of software development principles and methodologies."""
     principles = [
-        "Test-Driven Development (TDD): Write tests before implementation code.",
-        "SOLID Principles: Single responsibility, Open-closed, Liskov substitution, Interface segregation, Dependency inversion.",
-        "Clean Code Practices: Meaningful names, small functions, DRY (Don't Repeat Yourself), comments only when necessary.",
-        "Refactoring Techniques: Code smells identification, design pattern implementation, legacy code improvement.",
-        "Code Review Best Practices: Readability, maintainability, performance considerations."
+        TDD_PROMPT,
+        SOLID_PRINCIPLES_PROMPT,
+        CLEAN_CODE_PROMPT,
+        REFACTORING_BEST_PRACTICES,
+        CODE_REVIEW_BEST_PRACTICES
     ]
     return "\n".join(principles)
 
