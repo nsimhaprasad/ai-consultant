@@ -34,7 +34,6 @@ jobs:
         retention-days: 5
 
   build-linux-x86_64:
-    needs: test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -59,7 +58,6 @@ jobs:
         retention-days: 5
 
   build-macos:
-    needs: test
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
@@ -84,7 +82,6 @@ jobs:
         retention-days: 5
 
   build-windows:
-    needs: test
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
