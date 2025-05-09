@@ -10,7 +10,6 @@ on:
 
 jobs:
   build-package:
-    needs: test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
