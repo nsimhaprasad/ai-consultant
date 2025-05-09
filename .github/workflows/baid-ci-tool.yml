@@ -11,6 +11,7 @@ on:
     branches: [ main ]
     paths:
       - 'baid-ci/**'  # Trigger when files in baid-ci folder change
+  workflow_dispatch:
 
 jobs:
   build-package:
