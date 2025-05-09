@@ -125,6 +125,7 @@ def build_executable(platform_id):
         "--follow-imports",
         "--include-package=baid_ci",
         "--remove-output",
+        "--disable-ccache",
         "--lto=yes",
         "--plugin-enable=anti-bloat",
         "--prefer-source-code",
