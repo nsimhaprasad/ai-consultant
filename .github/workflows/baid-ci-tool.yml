@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     tags:
-      - 'baid-ci/v*'  # Trigger for any tag starting with baid-ci/v
+      - 'baid-ci-v*'  # Trigger for any tag starting with baid-ci-v (simplified format)
     paths:
       - 'baid-ci/**'  # Trigger when files in baid-ci folder change
   pull_request:
@@ -98,12 +98,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+
+    # Extract the tag version for use in the installer
+    - name: Extract tag version
+      id: get_version
+      run: |
+        if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=latest" >> $GITHUB_OUTPUT
+        fi
+
+    # Create install script
     - name: Prepare install script
       run: |
         mkdir -p dist
-        cp baid-ci/install.sh dist/
-        # Make the script executable
+        cp baid-ci/install.sh dist/install.sh
         chmod +x dist/install.sh
+
     - name: Upload install script
       uses: actions/upload-artifact@v4
       with:
@@ -113,13 +125,13 @@ jobs:
 
   pypi-publish:
     needs: build-package
-    # Only run for tags starting with baid-ci/v (e.g. baid-ci/v0.1.0)
-    if: startsWith(github.ref, 'refs/tags/baid-ci/v')
+    # Only run for tags starting with baid-ci-v (e.g. baid-ci-v0.1.2)
+    if: startsWith(github.ref, 'refs/tags/baid-ci-v')
     runs-on: ubuntu-latest
     steps:
     - name: Extract version from tag
       id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/baid-ci/v}" >> $GITHUB_OUTPUT
+      run: echo "VERSION=${GITHUB_REF#refs/tags/baid-ci-v}" >> $GITHUB_OUTPUT
     - name: Download Python packages
       uses: actions/download-artifact@v4
       with:
@@ -135,8 +147,8 @@ jobs:
 
   create-release:
     needs: [build-linux-x86_64, build-macos, prepare-install-script]
-    # Only run for tags starting with baid-ci/v (e.g. baid-ci/v0.1.0)
-    if: startsWith(github.ref, 'refs/tags/baid-ci/v')
+    # Only run for tags starting with baid-ci-v (e.g. baid-ci-v0.1.2)
+    if: startsWith(github.ref, 'refs/tags/baid-ci-v')
     # Need to use permissions for the job
     permissions:
       contents: write # This is crucial for creating releases
@@ -145,24 +157,36 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0 # Fetch all history for proper release notes
+
     - name: Extract version from tag
       id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/baid-ci/v}" >> $GITHUB_OUTPUT
+      run: echo "VERSION=${GITHUB_REF#refs/tags/baid-ci-v}" >> $GITHUB_OUTPUT
+
     - name: Download Linux executable
       uses: actions/download-artifact@v4
       with:
         name: linux-x86_64-executable
         path: dist/
+
     - name: Download macOS executable
       uses: actions/download-artifact@v4
       with:
         name: macos-x86_64-executable
         path: dist/
+
     - name: Download install script
       uses: actions/download-artifact@v4
       with:
         name: install-script
         path: dist/
+
+    # Make sure all scripts are executable
+    - name: Ensure scripts are executable
+      run: |
+        chmod +x dist/install.sh
+        chmod +x dist/baid-ci*
+
+    # Create the release with all artifacts
     - name: Create release
       uses: ncipollo/release-action@v1
       with:

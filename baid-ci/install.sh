@@ -1,5 +1,5 @@
 #!/bin/bash
-# BAID-CI Installation Script
+# BAID-CI Installation Script - Simplified Version
 set -e
 
 # Colors for output
@@ -11,10 +11,9 @@ NC='\033[0m' # No Color
 
 # Default installation directory
 INSTALL_DIR="/usr/local/bin"
-DEFAULT_VERSION="baid-ci/v0.1.0"
+DEFAULT_VERSION="baid-ci-v0.1.2"
 VERSION="$DEFAULT_VERSION"
 REPO_URL="https://github.com/nsimhaprasad/ai-consultant"
-LATEST_CHECK_URL="https://api.github.com/repos/nsimhaprasad/ai-consultant/releases/latest"
 
 print_header() {
     echo -e "${BLUE}============================================${NC}"
@@ -58,12 +57,6 @@ done
 
 print_header
 
-# Check for curl
-if ! command -v curl &> /dev/null; then
-    echo -e "${RED}Error: curl is required for installation${NC}"
-    exit 1
-fi
-
 # Determine OS and architecture
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
@@ -84,18 +77,27 @@ case "$OS" in
         ;;
 esac
 
-case "$ARCH" in
-    x86_64|amd64)
-        ARCHITECTURE="x86_64"
-        ;;
-    arm64|aarch64)
-        ARCHITECTURE="arm64"
-        ;;
-    *)
-        echo -e "${RED}Error: Unsupported architecture: $ARCH${NC}"
-        exit 1
-        ;;
-esac
+# For macOS, use x86_64 on both Intel and Apple Silicon
+if [ "$PLATFORM" = "macos" ]; then
+    ARCHITECTURE="x86_64"
+    if [ "$ARCH" = "arm64" ]; then
+        echo -e "${YELLOW}Detected Apple Silicon (arm64).${NC}"
+        echo -e "${YELLOW}Using x86_64 binary with Rosetta 2 translation.${NC}"
+    fi
+else
+    case "$ARCH" in
+        x86_64|amd64)
+            ARCHITECTURE="x86_64"
+            ;;
+        arm64|aarch64)
+            ARCHITECTURE="arm64"
+            ;;
+        *)
+            echo -e "${RED}Error: Unsupported architecture: $ARCH${NC}"
+            exit 1
+            ;;
+    esac
+fi
 
 # Determine file extension
 if [ "$PLATFORM" = "windows" ]; then
@@ -106,28 +108,7 @@ fi
 
 echo -e "${BLUE}Detected platform:${NC} $PLATFORM-$ARCHITECTURE"
 
-# Get latest version if specified
-if [ "$VERSION" = "latest" ]; then
-    echo -e "${BLUE}Fetching latest release information...${NC}"
-
-    # Get the latest release tag from GitHub API
-    LATEST_RELEASE=$(curl -s "$LATEST_CHECK_URL")
-    if [ -z "$LATEST_RELEASE" ]; then
-        echo -e "${RED}Error: Failed to fetch latest release information${NC}"
-        exit 1
-    fi
-
-    VERSION=$(echo "$LATEST_RELEASE" | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
-    if [ -z "$VERSION" ]; then
-        echo -e "${RED}Error: Failed to determine latest version${NC}"
-        echo -e "${YELLOW}Using default version: $DEFAULT_VERSION${NC}"
-        VERSION="$DEFAULT_VERSION"
-    else
-        echo -e "${GREEN}Latest version: $VERSION${NC}"
-    fi
-fi
-
-# Construct the download URL
+# Construct the download URL - now using simplified tag format
 FILENAME="baid-ci-$PLATFORM-$ARCHITECTURE$EXT"
 DOWNLOAD_URL="$REPO_URL/releases/download/$VERSION/$FILENAME"
 
@@ -138,24 +119,39 @@ echo -e "${BLUE}Download URL: $DOWNLOAD_URL${NC}"
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-# Download the binary
-if ! curl -L -o "$TMP_DIR/$FILENAME" "$DOWNLOAD_URL"; then
-    echo -e "${RED}Error: Failed to download BAID-CI binary${NC}"
-    echo -e "${RED}The requested binary may not be available for your platform.${NC}"
+# Download the binary with proper error handling
+HTTP_STATUS=$(curl -s -L -w "%{http_code}" -o "$TMP_DIR/$FILENAME" "$DOWNLOAD_URL")
+
+if [ "$HTTP_STATUS" != "200" ]; then
+    echo -e "${RED}Error: Failed to download binary (HTTP status: $HTTP_STATUS)${NC}"
+    echo -e "${RED}The URL may be incorrect or inaccessible.${NC}"
     exit 1
 fi
 
-# Make the binary executable
-if [ "$PLATFORM" != "windows" ]; then
-    chmod +x "$TMP_DIR/$FILENAME"
+# Check if the file is very small (likely an error message)
+FILE_SIZE=$(stat -f%z "$TMP_DIR/$FILENAME" 2>/dev/null || stat -c%s "$TMP_DIR/$FILENAME")
+if [ "$FILE_SIZE" -lt 1000 ]; then  # Less than 1KB is suspicious
+    echo -e "${RED}Warning: Downloaded file is very small ($FILE_SIZE bytes)${NC}"
+    echo -e "${RED}Content of the downloaded file:${NC}"
+    cat "$TMP_DIR/$FILENAME"
+    echo
+    echo -e "${RED}This doesn't look like a valid binary. Aborting installation.${NC}"
+    exit 1
 fi
+
+# Check file type
+FILE_TYPE=$(file "$TMP_DIR/$FILENAME")
+echo -e "${BLUE}File type:${NC} $FILE_TYPE"
+
+# Make the binary executable
+chmod +x "$TMP_DIR/$FILENAME"
 
 # Create installation directory if it doesn't exist
 if [ ! -d "$INSTALL_DIR" ]; then
     echo -e "${YELLOW}Creating installation directory: $INSTALL_DIR${NC}"
     if ! mkdir -p "$INSTALL_DIR"; then
         echo -e "${RED}Error: Failed to create installation directory${NC}"
-        echo -e "${YELLOW}Try running with sudo:${NC} sudo bash -c \"$(curl -fsSL $REPO_URL/releases/download/$VERSION/install.sh)\""
+        echo -e "${YELLOW}Try running with sudo:${NC} sudo bash -c \"$(curl -fsSL https://gist.githubusercontent.com/nsimhaprasad/5a2aa9f91b855c6792a96132887769df/raw/install.sh)\""
         exit 1
     fi
 fi
@@ -164,7 +160,7 @@ fi
 echo -e "${BLUE}Installing to $INSTALL_DIR/baid-ci$EXT...${NC}"
 if ! mv "$TMP_DIR/$FILENAME" "$INSTALL_DIR/baid-ci$EXT"; then
     echo -e "${RED}Error: Failed to install BAID-CI${NC}"
-    echo -e "${YELLOW}Try running with sudo:${NC} sudo bash -c \"$(curl -fsSL $REPO_URL/releases/download/$VERSION/install.sh)\""
+    echo -e "${YELLOW}Try running with sudo:${NC} sudo bash -c \"$(curl -fsSL https://gist.githubusercontent.com/nsimhaprasad/5a2aa9f91b855c6792a96132887769df/raw/install.sh)\""
     exit 1
 fi
 
