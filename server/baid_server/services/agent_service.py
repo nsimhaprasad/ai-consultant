@@ -116,9 +116,6 @@ class AgentService:
                 await self.session_repository.store_session_mapping(user_id, session_id)
                 logger.info(f"[{request_id}] Stored existing session {session_id} for user {user_id}")
 
-        # Store user message in database
-        await self.message_repository.store_message(user_id, session_id, "user", user_input)
-
         # Extract context information
         file_content = context.get("file_content", "")
         is_open = context.get("is_open", False)
@@ -134,9 +131,11 @@ class AgentService:
         {RESPONSE_FORMAT}
         """
 
+        # Store user message in database
+        await self.message_repository.store_message(user_id, session_id, "user", message)
+
         # Process response
         full_response = ""
-        json_buffer = ""
 
         try:
             # Stream the response using the stream_query method
@@ -154,10 +153,8 @@ class AgentService:
             stream_response = self.execution_client.stream_query_reasoning_engine(stream_request)
 
             for event in parse_agent_stream(stream_response):
-                print("event", event)
                 print("Started streaming response")
-                print("event", event)
-
+                full_response += str(event)
                 # Process chunks as they come in
                 sse_data = await ResponseParser.process_incoming_chunk(event)
                 if sse_data:
