@@ -1,6 +1,7 @@
 import os
 import json
 from google.adk import Agent
+from vertexai import agent_engines
 from .prompts import TDD_PROMPT, SOLID_PRINCIPLES_PROMPT, CODE_REVIEW_BEST_PRACTICES, CLEAN_CODE_PROMPT, REFACTORING_BEST_PRACTICES
 from typing import List, Optional
 
@@ -63,7 +64,7 @@ def generate_tests(code_snippet: str, test_framework: Optional[str] = None) -> s
 
 
 # --- BAID Agent ---
-agent = Agent(
+agent = agent_engines.create(
     name='BAID_agent',
     description='BESKAR.TECH development assistant that helps write code, refactor, create tests, and follow principles like TDD and SOLID.',
     instruction='Help developers write clean, maintainable code following best practices in software development. Provide guidance on testing, refactoring, and implementing design principles.',

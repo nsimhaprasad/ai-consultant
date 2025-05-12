@@ -8,31 +8,11 @@ from baid_server.core.models import JetbrainsResponse, Block
 logger = logging.getLogger(__name__)
 
 class ResponseParser:
-    """
-    A utility class for parsing and processing Jetbrains LLM responses.
-    Follows Single Responsibility Principle by focusing solely on parsing and validation.
-    """
-    
     @staticmethod
-    async def process_incoming_chunk(chunk: str, json_buffer: str) -> Optional[str]:
+    async def process_incoming_chunk(response: JetbrainsResponse) -> Optional[str]:
         try:
-            # Try to parse the complete buffer as a JetbrainsResponse
-            # Strip markdown code block formatting if present
-            cleaned_json = json_buffer
-            if json_buffer.startswith('```') and '```' in json_buffer[3:]:
-                # Extract content between markdown code blocks
-                start_idx = json_buffer.find('\n', 3) + 1
-                end_idx = json_buffer.rfind('```')
-                if start_idx > 0 and end_idx > start_idx:
-                    cleaned_json = json_buffer[start_idx:end_idx].strip()
-                else:
-                    # Simpler fallback - just strip the markers
-                    cleaned_json = json_buffer.strip('```json').strip('```')
-            
             # Extract blocks from the cleaned JSON
-            print("cleaned_json", cleaned_json)
-            blocks = ResponseParser.extract_blocks(cleaned_json)
-            print("blocks", blocks)
+            blocks = ResponseParser.extract_blocks(response)
             if blocks:
                 # Process all blocks and combine them into a single SSE message
                 all_blocks_data = []
@@ -53,25 +33,10 @@ class ResponseParser:
             return None
     
     @staticmethod
-    def extract_blocks(json_buffer: str) -> List[Dict[str, Any]]:
-        """
-        Extract blocks from a complete or partial JSON response.
-        
-        Args:
-            json_buffer: The accumulated JSON buffer
-            
-        Returns:
-            List[Dict[str, Any]]: List of extracted blocks
-        """
+    def extract_blocks(response: JetbrainsResponse) -> List[Dict[str, Any]]:
+        json_buffer = str(json.dumps(response.dict()))
         try:
-            # First try to parse as complete JSON
-            response_data = json.loads(json_buffer)
-            
-            # Deserialize into a JetbrainsResponse object
-            jetbrains_response = JetbrainsResponse(**response_data)
-            
-            # Extract blocks from the validated response
-            return [block.dict() for block in jetbrains_response.response.content.blocks]
+            return [block.dict() for block in response.response.content.blocks]
         except (json.JSONDecodeError, ValidationError, Exception) as e:
             # If complete parsing fails, try to extract blocks using regex
             print("JSON parsing error:", e)
@@ -135,15 +100,6 @@ class ResponseParser:
     
     @staticmethod
     def format_block_for_sse(block_obj: Dict[str, Any], include_sse_format: bool = True) -> Optional[str]:
-        """
-        Format a block for Server-Sent Events (SSE).
-        
-        Args:
-            block_obj: The block object to format
-            
-        Returns:
-            Optional[str]: Formatted SSE data or None if invalid
-        """
         try:
             block_json = json.dumps(block_obj)
             
@@ -158,15 +114,6 @@ class ResponseParser:
     
     @staticmethod
     def parse_jetbrains_response(json_data: str) -> Optional[JetbrainsResponse]:
-        """
-        Parse and validate a complete JetbrainsResponse.
-        
-        Args:
-            json_data: The JSON string to parse
-            
-        Returns:
-            Optional[JetbrainsResponse]: Parsed response or None if invalid
-        """
         try:
             response_data = json.loads(json_data)
             return JetbrainsResponse(**response_data)

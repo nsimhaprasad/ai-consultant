@@ -41,7 +41,7 @@ object ContentRenderer {
             else -> label.font.deriveFont(label.font.style, 14f)
         }
         label.font = font
-        label.border = getMessageWidth().let { com.intellij.util.ui.JBUI.Borders.empty(6) }
+        label.border = getMessageWidth().let { JBUI.Borders.empty(6) }
         println("Heading content: $content")
         return label
     }
@@ -58,7 +58,7 @@ object ContentRenderer {
             val label = JBLabel(html)
             label.border = JBUI.Borders.empty(4)
             return label
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Fallback to plain text if HTML rendering fails
             val fallbackPanel = JBPanel<JBPanel<*>>(BorderLayout())
             val plainLabel = JBLabel(block.content)
@@ -102,14 +102,14 @@ object ContentRenderer {
             
             // Use advanced line wrapping that preserves indentation
             setWrapStyleWord(false) // Don't wrap at word boundaries, but at any character
-            setPaintTabLines(true) // Show tab guides
-            setWhitespaceVisible(true) // Make whitespace visible for better readability
-            setEOLMarkersVisible(false) // Hide EOL markers
-            setMarkOccurrences(false) // Disable mark occurrences to avoid confusion
+            paintTabLines = true // Show tab guides
+            isWhitespaceVisible = true // Make whitespace visible for better readability
+            eolMarkersVisible = false // Hide EOL markers
+            markOccurrences = false // Disable mark occurrences to avoid confusion
         }
         // Calculate a reasonable height based on content (with minimum and maximum limits)
         val lineCount = block.content.lines().size
-        val calculatedHeight = Math.min(500, Math.max(100, lineCount * 20))
+        val calculatedHeight = 500.coerceAtMost(100.coerceAtLeast(lineCount * 20))
         
         val scroll = RTextScrollPane(textArea).apply {
             border = JBUI.Borders.empty()
@@ -158,7 +158,7 @@ object ContentRenderer {
         when (val params = block.parameters) {
             is Parameters.CreateFileParams -> {
                 val link = JBLabel("<html><a href=\"#\">Create file: ${params.path}</a></html>")
-                link.cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+                link.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                 panel.add(link)
             }
 
@@ -200,7 +200,7 @@ object ContentRenderer {
                 // Add to panel with try-catch to handle any rendering exceptions
                 try {
                     panel.add(label)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Fallback to plain text if HTML rendering fails
                     val plainLabel = JBLabel("$prefix ${item.content}")
                     plainLabel.border = JBUI.Borders.empty(2)

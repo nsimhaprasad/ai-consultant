@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 python-dotenv
-google-cloud-aiplatform[adk,agent_engines]
+google-cloud-aiplatform[agent_engines,adk]==1.91.0
 google-cloud-storage
 httpx
 python-jose
@@ -13,3 +13,4 @@ psycopg2-binary
 setuptools
 wheel
 pydantic[email]
+asyncpg==0.30.0
