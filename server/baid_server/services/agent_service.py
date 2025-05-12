@@ -132,7 +132,7 @@ class AgentService:
         """
 
         # Store user message in database
-        await self.message_repository.store_message(user_id, session_id, "user", message)
+        await self.message_repository.store_message(user_id, session_id, "user", user_input)
 
         # Process response
         full_response = ""
