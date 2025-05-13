@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 env:
-  GCS_BUCKET: "baid-ci-releases-ai-consultant-458311"  # Your bucket name with project ID
+  GCS_BUCKET: "baid-ci-releases"  # Your bucket name with project ID
   GCP_PROJECT_ID: "ai-consultant-458311"  # Your project ID
 
 jobs:
