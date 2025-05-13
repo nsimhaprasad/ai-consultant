@@ -213,6 +213,9 @@ def check_can_build(platform_id):
     if platform_id == current:
         return True
 
+    # Check if cross-compilation is supported
+    cross_key = f"{current_os}-to-{target_os}"
+
     # Check if we're in a CI environment (GitHub Actions or other CI systems)
     in_ci = os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true"
 
@@ -220,9 +223,6 @@ def check_can_build(platform_id):
     if cross_key == "linux-to-linux" and in_ci:
         print(f"CI environment detected, allowing cross-compilation from {current} to {platform_id}")
         return True
-
-    # Check if cross-compilation is supported
-    cross_key = f"{current_os}-to-{target_os}"
 
     if cross_key in CROSS_COMPILE:
         return CROSS_COMPILE[cross_key]
