@@ -28,7 +28,14 @@ PLATFORMS = {
     },
     "macos-arm64": {
         "output": "baid-ci-macos-arm64",
-        "extra_args": ["--jobs={}".format(max(1, multiprocessing.cpu_count() - 1))]
+        "extra_args": [
+            "--jobs={}".format(max(1, multiprocessing.cpu_count() - 1)),
+            "--include-package=certifi",
+            "--include-package=urllib3",
+            "--include-package=idna",
+            "--include-package=charset_normalizer",
+            "--include-package=openssl"
+        ]
     },
     "windows-x86_64": {
         "output": "baid-ci-windows-x86_64.exe",
@@ -108,8 +115,9 @@ def ensure_nuitka_installed():
     except (subprocess.SubprocessError, FileNotFoundError):
         print("Installing Nuitka...")
         try:
-            subprocess.run([sys.executable, "-m", "pip", "install", "nuitka>=2.7.1", "ordered-set", "pytest-runner"],
-                           check=True)
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "nuitka>=2.7.1", "ordered-set", "pytest-runner", "pyqt5"],
+                check=True)
             print("✓ Nuitka installed successfully")
             return True
         except subprocess.SubprocessError as e:
@@ -290,6 +298,7 @@ def build_executable(platform_id):
         "--onefile",
         "--follow-imports",
         "--include-package=baid_ci",
+        "--enable-plugin=pyqt5",  # This helps with SSL libs
         "--remove-output",
         "--lto=yes",
         "--plugin-enable=anti-bloat",
