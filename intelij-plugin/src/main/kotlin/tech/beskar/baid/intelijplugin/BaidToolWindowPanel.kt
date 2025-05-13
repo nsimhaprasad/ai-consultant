@@ -1093,6 +1093,10 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                         // Parse and render the block
                                         try {
                                             val jsonObj = JSONObject(jsonStr)
+                                            if(jsonObj.has("session_id")) {
+                                                updatedSessionId = jsonObj.optString("session_id", "")
+                                                break
+                                            }
                                             if (jsonObj.has("blocks")) {
                                                 val response = ContentParser.parseResponse(jsonStr)
                                                 response.blocks.forEach { block ->

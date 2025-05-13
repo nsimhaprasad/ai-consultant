@@ -93,7 +93,6 @@ class GoogleAuthService {
                         .connectTimeout(5000)
                         .readTimeout(5000)
                         .readString()
-
                     val json = JSONObject(response)
                     if (json.has("error") && !json.isNull("error")) {
                         resultFuture.completeExceptionally(RuntimeException(json.getString("error")))

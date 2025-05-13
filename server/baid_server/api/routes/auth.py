@@ -69,4 +69,4 @@ async def get_oauth_session(
             status_code=404,
             content={"error": "Session not found or expired"}
         )
-    return session
+    return JSONResponse(content=session)
