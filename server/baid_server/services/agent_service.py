@@ -156,10 +156,9 @@ class AgentService:
                 print("Started streaming response")
                 full_response += str(event)
                 # Process chunks as they come in
-                sse_data = await ResponseParser.process_incoming_chunk(event)
-                if sse_data:
+                async for sse_data in ResponseParser.process_incoming_chunk(event):
                     yield sse_data
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(1)
 
             # Send session_id and final marker
             session_data = f"data: {{\"session_id\": \"{session_id}\"}}\n\n"

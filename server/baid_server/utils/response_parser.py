@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, AsyncGenerator
 
 from pydantic import ValidationError
 
@@ -11,28 +11,21 @@ logger = logging.getLogger(__name__)
 
 class ResponseParser:
     @staticmethod
-    async def process_incoming_chunk(response: JetbrainsResponse) -> Optional[str]:
+    async def process_incoming_chunk(response: JetbrainsResponse) -> AsyncGenerator[str, None]:
         try:
             # Extract blocks from the cleaned JSON
             blocks = ResponseParser.extract_blocks(response)
+            print("Blocks extracted:", blocks)
             if blocks:
-                # Process all blocks and combine them into a single SSE message
-                all_blocks_data = []
                 for block in blocks:
                     # Format each block
                     formatted_block = ResponseParser.format_block_for_sse(block, include_sse_format=False)
                     if formatted_block:
-                        all_blocks_data.append(formatted_block)
-
-                # Combine all blocks into a single SSE message
-                if all_blocks_data:
-                    combined_data = json.dumps({"blocks": all_blocks_data})
-                    return f"data: {combined_data}\n\n"
-
-            return None
+                        # Stream each block individually
+                        print("Formatted block:", formatted_block)
+                        yield f"data: {formatted_block}\n\n"
         except Exception as e:
             logger.debug(f"Error processing chunk: {str(e)}")
-            return None
 
     @staticmethod
     def extract_blocks(response: JetbrainsResponse) -> List[Dict[str, Any]]:

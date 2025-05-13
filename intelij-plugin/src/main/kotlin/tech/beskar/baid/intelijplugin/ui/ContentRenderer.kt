@@ -23,14 +23,14 @@ import java.awt.Cursor
 import java.awt.Font
 import javax.swing.BorderFactory
 import javax.swing.JScrollPane
+import javax.swing.Timer
+import javax.swing.SwingUtilities
 
-/**
- * Renders parsed content blocks into Swing components.
- */
+
 object ContentRenderer {
     fun renderHeading(block: Block.Heading): JComponent {
         val content = block.content
-        val label = JBLabel(content)
+        val label = JBLabel()
         val font = when (block.level) {
             1 -> label.font.deriveFont(label.font.style or Font.BOLD, 22f)
             2 -> label.font.deriveFont(label.font.style or Font.BOLD, 18f)
@@ -43,6 +43,12 @@ object ContentRenderer {
         label.font = font
         label.border = getMessageWidth().let { JBUI.Borders.empty(6) }
         println("Heading content: $content")
+        
+        // Animate heading text appearance
+        SwingUtilities.invokeLater {
+            animateTextAppearance(label, content, false, 150)
+        }
+        
         return label
     }
 
@@ -55,14 +61,26 @@ object ContentRenderer {
             val html = "<html><div style='width:${getMessageWidth() - 20}px;'>$processedContent</div></html>"
             
             // Create and configure the label
-            val label = JBLabel(html)
+            val label = JBLabel()
             label.border = JBUI.Borders.empty(4)
+            
+            // Animate text appearance
+            SwingUtilities.invokeLater {
+                animateTextAppearance(label, html, true)
+            }
+            
             return label
         } catch (_: Exception) {
             // Fallback to plain text if HTML rendering fails
             val fallbackPanel = JBPanel<JBPanel<*>>(BorderLayout())
-            val plainLabel = JBLabel(block.content)
+            val plainLabel = JBLabel()
             plainLabel.border = JBUI.Borders.empty(4)
+            
+            // Animate text appearance with plain text
+            SwingUtilities.invokeLater {
+                animateTextAppearance(plainLabel, block.content)
+            }
+            
             fallbackPanel.add(plainLabel, BorderLayout.CENTER)
             return fallbackPanel
         }
@@ -171,18 +189,12 @@ object ContentRenderer {
         return panel
     }
 
-    /**
-     * Renders list blocks into a vertical panel with bullet or numbered items.
-     */
-    /**
-     * Render a list block (ordered or unordered)
-     * Properly handles markdown-style formatting in list items
-     */
     fun renderList(block: Block.ListBlock): JComponent {
         val panel = JBPanel<JBPanel<*>>(VerticalLayout(8))
         panel.border = JBUI.Borders.empty(4, 8, 4, 8)
         
         try {
+            // Create and add list items with a slight increasing delay for each item
             block.items.forEachIndexed { idx, item ->
                 // Create the list item prefix (bullet or number)
                 val prefix = if (block.ordered) "${idx + 1}. " else "\u2022 "
@@ -193,18 +205,35 @@ object ContentRenderer {
                 // Create the HTML with proper width constraints and processed content
                 val html = "<html><div style='width:${getMessageWidth() - 40}px;'><span style='font-weight:bold;'>$prefix</span> $processedContent</div></html>"
                 
-                // Create and configure the label
-                val label = JBLabel(html)
+                // Create and configure the label (initially empty)
+                val label = JBLabel()
                 label.border = JBUI.Borders.empty(2)
                 
                 // Add to panel with try-catch to handle any rendering exceptions
                 try {
                     panel.add(label)
+                    
+                    // Animate text appearance with increasing delay for each item
+                    SwingUtilities.invokeLater {
+                        // Add a small delay for each subsequent item (20ms * index)
+                        Timer(20 * idx) { 
+                            animateTextAppearance(label, html, true)
+                            (it.source as Timer).stop()
+                        }.start()
+                    }
                 } catch (_: Exception) {
                     // Fallback to plain text if HTML rendering fails
-                    val plainLabel = JBLabel("$prefix ${item.content}")
+                    val plainLabel = JBLabel()
                     plainLabel.border = JBUI.Borders.empty(2)
                     panel.add(plainLabel)
+                    
+                    // Animate plain text with delay
+                    SwingUtilities.invokeLater {
+                        Timer(20 * idx) {
+                            animateTextAppearance(plainLabel, "$prefix ${item.content}")
+                            (it.source as Timer).stop()
+                        }.start()
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -216,10 +245,7 @@ object ContentRenderer {
         return panel
     }
     
-    /**
-     * Process markdown-style formatting in text
-     * Converts **text** to <b>text</b>, etc.
-     */
+
     private fun processMarkdownFormatting(text: String): String {
         var processed = text
         
@@ -253,14 +279,14 @@ object ContentRenderer {
         val contentPanel = JBPanel<JBPanel<*>>(VerticalLayout(8))
         contentPanel.background = bgColor
         
-        // Create and style the title
-        val titleLabel = JBLabel("<html><b>${block.title}</b></html>")
+        // Create and style the title (initially empty)
+        val titleLabel = JBLabel()
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 14f)
         titleLabel.foreground = JBColor.foreground()
         
         // Process the content to preserve newlines
         val processedContent = block.content.replace("\n", "<br>")
-        val contentLabel = JBLabel("<html><div style='width:${getMessageWidth() - 30}px;'>$processedContent</div></html>")
+        val contentLabel = JBLabel()
         contentLabel.foreground = JBColor.foreground()
         
         // Add components to the content panel
@@ -270,12 +296,22 @@ object ContentRenderer {
         // Add content panel to the main panel
         panel.add(contentPanel, BorderLayout.CENTER)
         
+        // Animate text appearance with a sequential effect
+        SwingUtilities.invokeLater {
+            // First animate the title
+            animateTextAppearance(titleLabel, "<html><b>${block.title}</b></html>", true, 120)
+            
+            // Then animate the content with a slight delay
+            Timer(100) {
+                animateTextAppearance(contentLabel, "<html><div style='width:${getMessageWidth() - 30}px;'>$processedContent</div></html>", true)
+                (it.source as Timer).stop()
+            }.start()
+        }
+        
         return panel
     }
     
-    /**
-     * Get appropriate colors for a callout based on its style
-     */
+
     private fun getCalloutColors(style: String): Pair<Color, Color> {
         return when (style.lowercase()) {
             "info" -> Pair(
@@ -298,6 +334,82 @@ object ContentRenderer {
                 JBColor(Color(242, 242, 242), Color(50, 50, 50)),
                 JBColor(Color(204, 204, 204), Color(100, 100, 100))
             )
+        }
+    }
+
+    private fun animateTextAppearance(label: JBLabel, fullText: String, isHtml: Boolean = false, durationMs: Int = 200) {
+        // Store original text
+        val originalText = fullText
+        
+        // If text is too short or animation disabled, just set the text directly
+        if (originalText.length < 20 || durationMs <= 0) {
+            label.text = originalText
+            return
+        }
+        
+        // Calculate how many characters to add per frame
+        val textLength = originalText.length
+        val framesCount = 10 // Number of animation frames
+        val charsPerFrame = (textLength / framesCount).coerceAtLeast(1)
+        val frameDelay = (durationMs / framesCount).coerceAtLeast(10)
+        
+        // For HTML content, we need special handling
+        if (isHtml) {
+            // Extract the actual content between HTML tags
+            val htmlPrefix = if (originalText.startsWith("<html")) 
+                originalText.substringBefore(">") + ">" 
+            else 
+                "<html>"
+            
+            val htmlSuffix = if (originalText.endsWith("</html>")) 
+                "</html>" 
+            else 
+                "</html>"
+                
+            val contentStart = originalText.indexOf(">") + 1
+            val contentEnd = originalText.lastIndexOf("</")
+            
+            val content = if (contentStart > 0 && contentEnd > contentStart)
+                originalText.substring(contentStart, contentEnd)
+            else
+                originalText
+                
+            var currentLength = 0
+            
+            val timer = Timer(frameDelay) { e ->
+                currentLength = (currentLength + charsPerFrame).coerceAtMost(content.length)
+                
+                if (currentLength >= content.length) {
+                    label.text = originalText
+                    (e.source as Timer).stop()
+                } else {
+                    // Create partial content
+                    val partialContent = content.substring(0, currentLength)
+                    label.text = "$htmlPrefix$partialContent$htmlSuffix"
+                }
+            }
+            
+            // Start with empty content
+            label.text = "$htmlPrefix$htmlSuffix"
+            timer.start()
+        } else {
+            // For plain text, animation is simpler
+            var currentLength = 0
+            
+            val timer = Timer(frameDelay) { e ->
+                currentLength = (currentLength + charsPerFrame).coerceAtMost(textLength)
+                
+                if (currentLength >= textLength) {
+                    label.text = originalText
+                    (e.source as Timer).stop()
+                } else {
+                    label.text = originalText.substring(0, currentLength)
+                }
+            }
+            
+            // Start with empty text
+            label.text = ""
+            timer.start()
         }
     }
 }

@@ -3,18 +3,15 @@ package tech.beskar.baid.intelijplugin
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.IconLoader
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.io.HttpRequests
+import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.JBUI
-import com.vladsch.flexmark.html.HtmlRenderer
-import com.vladsch.flexmark.parser.Parser
-import com.vladsch.flexmark.util.ast.Node
-import com.vladsch.flexmark.util.data.MutableDataSet
-import tech.beskar.baid.intelijplugin.ui.MessageFormatter
 import org.json.JSONArray
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
@@ -23,17 +20,19 @@ import tech.beskar.baid.intelijplugin.config.BaidConfiguration
 import tech.beskar.baid.intelijplugin.model.Block
 import tech.beskar.baid.intelijplugin.model.ContentParser
 import tech.beskar.baid.intelijplugin.ui.ContentRenderer
+import tech.beskar.baid.intelijplugin.ui.MessageFormatter
 import tech.beskar.baid.intelijplugin.util.FontUtil
 import tech.beskar.baid.intelijplugin.util.getMessageWidth
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.awt.geom.Ellipse2D
+import java.awt.image.BufferedImage
+import java.net.URL
+import javax.imageio.ImageIO
 import javax.swing.*
 
 class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindowPanel>(BorderLayout()) {
-    // No need for HTML and CSS constants as they're now in MessageFormatter
-    private val HTML_WRAPPER_STYLE = "word-wrap: break-word; margin: 0; padding: 0; overflow-wrap: break-word;"
-
     // Update all message bubbles when window is resized
     private fun updateAllMessageWidths() {
         // Only proceed if there are messages
@@ -109,18 +108,59 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     private val mainPanel = JBPanel<JBPanel<*>>(BorderLayout())
 
     // User profile button reference
-    private lateinit var userProfileButton: JButton
+    private var userProfileButton: JButton
 
     // SESSION MANAGEMENT
     private var currentSessionId: String? = null
-    private lateinit var newSessionButton: JButton
+    private var newSessionButton: JButton
 
     // PAST CONVERSATIONS
-    private lateinit var pastConversationsButton: JButton
+    private var pastConversationsButton: JButton
     private val pastConversationsPanel = JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(8)))
     private val cardLayout = CardLayout()
     private val chatContainer = JBPanel<JBPanel<*>>()
     private var isShowingPastConversations = false
+
+    private inner class CircularAvatarLabel(text: String) : JLabel(text) {
+        init {
+            horizontalAlignment = CENTER
+            verticalAlignment = CENTER
+            isOpaque = false
+        }
+
+        override fun paintComponent(g: Graphics) {
+            val config = GraphicsUtil.setupAAPainting(g)
+            val g2d = g as Graphics2D
+
+            // Don't fill the background at all - make it fully transparent
+            if (icon == null) {
+                // For text avatar
+                g2d.color = background
+                g2d.fillOval(0, 0, width, height)
+                super.paintComponent(g)
+            } else {
+                // For image avatar
+                val circle = Ellipse2D.Float(0f, 0f, width.toFloat(), height.toFloat())
+                g2d.clip = circle
+
+                // Center the icon
+                val iconWidth = icon.iconWidth
+                val iconHeight = icon.iconHeight
+                val x = (width - iconWidth) / 2
+                val y = (height - iconHeight) / 2
+
+                icon.paintIcon(this, g2d, x, y)
+            }
+
+            config.restore()
+        }
+
+        // Override isOpaque to ensure transparency
+        override fun isOpaque(): Boolean {
+            return false
+        }
+    }
+
 
     init {
         // Set up the login panel
@@ -620,6 +660,42 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         }
     }
 
+    private fun loadProfileImage(imageUrl: String, size: Int): ImageIcon? {
+        return try {
+            // Download the image from URL
+            val url = URL(imageUrl)
+            val originalImage = ImageIO.read(url) ?: return null
+
+            // Create a clean circular image with transparency
+            val outputImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+            val g2d = outputImage.createGraphics()
+
+            try {
+                // Configure for high quality
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+
+                // Scale the image preserving aspect ratio
+                val scaledImage = originalImage.getScaledInstance(size, size, Image.SCALE_SMOOTH)
+
+                // Create circular mask
+                val circle = Ellipse2D.Float(0f, 0f, size.toFloat(), size.toFloat())
+                g2d.clip = circle
+
+                // Draw the image centered in the circle
+                g2d.drawImage(scaledImage, 0, 0, null)
+            } finally {
+                g2d.dispose() // Always clean up graphics context
+            }
+
+            // Return as an ImageIcon
+            ImageIcon(outputImage)
+        } catch (e: Exception) {
+            println("Error loading profile image: ${e.message}")
+            null
+        }
+    }
+
     private fun updateUserProfileButton() {
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
@@ -632,8 +708,8 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                         val buttonPanel = JPanel(BorderLayout(4, 0)).apply {
                             isOpaque = false
 
-                            // Create avatar label
-                            val avatarLabel = JLabel(userInfo.name.firstOrNull()?.toString() ?: "U").apply {
+                            // Create a CircularAvatarLabel instance for the profile avatar
+                            var avatarLabel = JLabel(userInfo.name.firstOrNull()?.toString() ?: "U").apply {
                                 font = Font(Font.SANS_SERIF, Font.BOLD, 14)
                                 foreground = Color.WHITE
                                 background = JBColor(Color(70, 130, 180), Color(100, 149, 237))
@@ -650,6 +726,34 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                         super.paintComponent(g)
                                     }
                                 }
+                            }
+
+                            if (userInfo.picture != null) {
+                                avatarLabel =
+                                    CircularAvatarLabel(userInfo.name.firstOrNull()?.toString() ?: "U").apply {
+                                        font = Font(Font.SANS_SERIF, Font.BOLD, 14)
+                                        foreground = Color.WHITE
+                                        background = JBColor(Color(56, 114, 159), Color(56, 114, 159))
+                                        isOpaque = true
+                                        horizontalAlignment = SwingConstants.CENTER
+                                        verticalAlignment = SwingConstants.CENTER
+                                        preferredSize = Dimension(24, 24)
+                                        border = BorderFactory.createEmptyBorder()
+
+                                        // Load profile image in background thread
+                                        ApplicationManager.getApplication().executeOnPooledThread {
+                                            val profileIcon = loadProfileImage(userInfo.picture, 24)
+                                            if (profileIcon != null) {
+                                                // Update UI on EDT
+                                                SwingUtilities.invokeLater {
+                                                    text = "" // Clear the text (initial letter)
+                                                    icon = profileIcon
+                                                    // Keep isOpaque true for proper clipping
+                                                    repaint()
+                                                }
+                                            }
+                                        }
+                                    }
                             }
 
                             add(avatarLabel, BorderLayout.WEST)
@@ -865,18 +969,39 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
                 // First add the bubble
                 add(bubbleContainer)
-
-                // Then add the avatar
-                val avatarLabel = JLabel().apply {
-                    icon = AllIcons.General.User
-                    border = JBUI.Borders.emptyLeft(JBUI.scale(8))
+                var avatarLabel = JLabel().apply {
+                    icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
+                    border = JBUI.Borders.emptyRight(JBUI.scale(8))
                     verticalAlignment = JLabel.TOP
+                }
+                val userInfo = authService.getUserInfo()
+
+                // Then add the avatar with profile picture if available
+                if (userInfo?.picture != null) {
+                    avatarLabel = CircularAvatarLabel("").apply {
+                        // Default icon in case profile picture can't be loaded
+                        preferredSize = Dimension(24, 24)
+                        border = JBUI.Borders.emptyLeft(JBUI.scale(8))
+                        verticalAlignment = JLabel.TOP
+
+                        // Try to get user info and profile picture
+                        // Load profile image asynchronously to prevent UI freezes
+                        ApplicationManager.getApplication().executeOnPooledThread {
+                            val profileIcon = loadProfileImage(userInfo.picture, 24)
+                            if (profileIcon != null) {
+                                // Update UI on EDT
+                                ApplicationManager.getApplication().invokeLater {
+                                    icon = profileIcon
+                                }
+                            }
+                        }
+                    }
                 }
                 add(avatarLabel)
             } else {
                 // Agent message: avatar on left, bubble on right
                 val avatarLabel = JLabel().apply {
-                    icon = AllIcons.General.BalloonInformation
+                    icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
                     border = JBUI.Borders.emptyRight(JBUI.scale(8))
                     verticalAlignment = JLabel.TOP
                 }
@@ -902,10 +1027,10 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
             // Scroll to bottom
             SwingUtilities.invokeLater {
-            val vertical = chatScroll.verticalScrollBar
-            vertical.value = vertical.maximum
+                val vertical = chatScroll.verticalScrollBar
+                vertical.value = vertical.maximum
+            }
         }
-    }
     }
 
     fun consultWithAPI(userPrompt: String) {
@@ -1045,7 +1170,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
                                 // Create message with avatar container for agent response
                                 val avatarLabel = JLabel().apply {
-                                    icon = AllIcons.General.BalloonInformation
+                                    icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
                                     border = JBUI.Borders.emptyRight(JBUI.scale(8))
                                     verticalAlignment = JLabel.TOP
                                 }
@@ -1093,7 +1218,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                         // Parse and render the block
                                         try {
                                             val jsonObj = JSONObject(jsonStr)
-                                            if(jsonObj.has("session_id")) {
+                                            if (jsonObj.has("session_id")) {
                                                 updatedSessionId = jsonObj.optString("session_id", "")
                                                 break
                                             }
@@ -1137,12 +1262,13 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                             }
                                         } catch (e: Exception) {
                                             println("Error parsing block: $e")
-//                                             val comp = ContentRenderer.renderParagraph(Block.Paragraph("Something went wrong! Please try again"))
-//                                             SwingUtilities.invokeLater {
-//                                                 bubbleContainer.add(comp)
-//                                                 messagePanel.revalidate()
-//                                                 messagePanel.repaint()
-//                                             }
+                                            val comp =
+                                                ContentRenderer.renderParagraph(Block.Paragraph("Something went wrong! Please try again"))
+                                            SwingUtilities.invokeLater {
+                                                bubbleContainer.add(comp)
+                                                messagePanel.revalidate()
+                                                messagePanel.repaint()
+                                            }
                                         }
                                     }
                                 }
