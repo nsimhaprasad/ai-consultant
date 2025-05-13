@@ -54,7 +54,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r baid-ci/requirements.txt
-        pip install nuitka ordered-set pytest-runner patchelf
+        pip install nuitka>=2.7.1 ordered-set pytest-runner patchelf
     - name: Build executable
       working-directory: baid-ci
       run: |
@@ -66,7 +66,31 @@ jobs:
         path: baid-ci/build/baid-ci-linux-x86_64
         retention-days: 5
 
-  build-macos:
+  build-linux-arm64:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r baid-ci/requirements.txt
+        pip install nuitka>=2.7.1 ordered-set pytest-runner patchelf
+    - name: Build executable
+      working-directory: baid-ci
+      run: |
+        python scripts/build_executables.py linux-arm64
+    - name: Upload Linux ARM64 executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-arm64-executable
+        path: baid-ci/build/baid-ci-linux-arm64
+        retention-days: 5
+
+  build-macos-x86_64:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
@@ -78,7 +102,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r baid-ci/requirements.txt
-        pip install nuitka==2.7.1 ordered-set pytest-runner
+        pip install nuitka>=2.7.1 ordered-set pytest-runner
         brew install ccache
     - name: Configure ccache environment
       run: |
@@ -91,11 +115,43 @@ jobs:
       run: |
         export PATH="/usr/local/opt/ccache/libexec:$PATH"
         python scripts/build_executables.py macos-x86_64
-    - name: Upload macOS executable
+    - name: Upload macOS Intel executable
       uses: actions/upload-artifact@v4
       with:
         name: macos-x86_64-executable
         path: baid-ci/build/baid-ci-macos-x86_64
+        retention-days: 5
+
+  build-macos-arm64:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r baid-ci/requirements.txt
+        pip install nuitka>=2.7.1 ordered-set pytest-runner
+        brew install ccache
+    - name: Configure ccache environment
+      run: |
+        echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+        mkdir -p $HOME/.ccache
+        ccache -M 500M
+        ccache -o compression=true
+    - name: Build executable
+      working-directory: baid-ci
+      run: |
+        export PATH="/usr/local/opt/ccache/libexec:$PATH"
+        python scripts/build_executables.py macos-arm64
+    - name: Upload macOS ARM64 executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-arm64-executable
+        path: baid-ci/build/baid-ci-macos-arm64
         retention-days: 5
 
   generate-install-script:
@@ -153,11 +209,13 @@ jobs:
             echo -e "Options:"
             echo -e "  -v, --version VERSION    Specify version to install (default: \$DEFAULT_VERSION)"
             echo -e "  -d, --dir DIRECTORY      Specify installation directory (default: /usr/local/bin)"
+            echo -e "  -f, --force-arch ARCH    Force architecture (x86_64 or arm64) instead of auto-detect"
             echo -e "  -h, --help               Display this help message"
             echo
         }
         
         # Parse command line arguments
+        FORCE_ARCH=""
         while [[ \$# -gt 0 ]]; do
             case \$1 in
                 -v|--version)
@@ -166,6 +224,10 @@ jobs:
                     ;;
                 -d|--dir)
                     INSTALL_DIR="\$2"
+                    shift 2
+                    ;;
+                -f|--force-arch)
+                    FORCE_ARCH="\$2"
                     shift 2
                     ;;
                 -h|--help)
@@ -203,19 +265,21 @@ jobs:
                 ;;
         esac
         
-        # For macOS, use x86_64 on both Intel and Apple Silicon
-        if [ "\$PLATFORM" = "macos" ]; then
-            ARCHITECTURE="x86_64"
-            if [ "\$ARCH" = "arm64" ]; then
-                echo -e "\${YELLOW}Detected Apple Silicon (arm64).\${NC}"
-                echo -e "\${YELLOW}Using x86_64 binary with Rosetta 2 translation.\${NC}"
+        # Determine architecture, with support for force-arch option
+        if [ -n "\$FORCE_ARCH" ]; then
+            if [ "\$FORCE_ARCH" = "x86_64" ] || [ "\$FORCE_ARCH" = "arm64" ]; then
+                ARCHITECTURE="\$FORCE_ARCH"
+                echo -e "\${YELLOW}Forcing architecture: \$ARCHITECTURE\${NC}"
+            else
+                echo -e "\${RED}Error: Invalid architecture: \$FORCE_ARCH. Must be x86_64 or arm64.\${NC}"
+                exit 1
             fi
         else
             case "\$ARCH" in
                 x86_64|amd64)
                     ARCHITECTURE="x86_64"
                     ;;
-                arm64|aarch64)
+                arm64|aarch64|arm64e)
                     ARCHITECTURE="arm64"
                     ;;
                 *)
@@ -245,11 +309,24 @@ jobs:
         TMP_DIR=\$(mktemp -d)
         trap 'rm -rf "\$TMP_DIR"' EXIT
         
-        # Download the binary
-        if ! curl -L -o "\$TMP_DIR/\$FILENAME" "\$DOWNLOAD_URL"; then
-            echo -e "\${RED}Error: Failed to download BAID-CI binary\${NC}"
-            echo -e "\${RED}The requested binary may not be available for your platform.\${NC}"
-            exit 1
+        # Try to download the binary, fall back to x86_64 on macOS if arm64 is not available
+        if ! curl -L -f -o "\$TMP_DIR/\$FILENAME" "\$DOWNLOAD_URL"; then
+            if [ "\$PLATFORM" = "macos" ] && [ "\$ARCHITECTURE" = "arm64" ]; then
+                echo -e "\${YELLOW}Native ARM64 binary not found. Falling back to x86_64 with Rosetta 2 translation.\${NC}"
+                ARCHITECTURE="x86_64"
+                FILENAME="baid-ci-\$PLATFORM-\$ARCHITECTURE\$EXT"
+                DOWNLOAD_URL="\$BUCKET_URL/\$VERSION/\$FILENAME"
+                
+                if ! curl -L -f -o "\$TMP_DIR/\$FILENAME" "\$DOWNLOAD_URL"; then
+                    echo -e "\${RED}Error: Failed to download fallback binary\${NC}"
+                    echo -e "\${RED}The requested binary may not be available for your platform.\${NC}"
+                    exit 1
+                fi
+            else
+                echo -e "\${RED}Error: Failed to download BAID-CI binary\${NC}"
+                echo -e "\${RED}The requested binary may not be available for your platform.\${NC}"
+                exit 1
+            fi
         fi
         
         # Check if the file is very small (likely an error message)
@@ -272,6 +349,7 @@ jobs:
             if ! mkdir -p "\$INSTALL_DIR"; then
                 echo -e "\${RED}Error: Failed to create installation directory\${NC}"
                 echo -e "\${YELLOW}Try running with sudo:\${NC} sudo bash -c \"\$(curl -fsSL \$BUCKET_URL/\$VERSION/install.sh)\""
+                echo -e "\${YELLOW}Or specify a different directory:\${NC} curl -fsSL \$BUCKET_URL/\$VERSION/install.sh | bash -s -- -d ~/bin"
                 exit 1
             fi
         fi
@@ -281,6 +359,7 @@ jobs:
         if ! mv "\$TMP_DIR/\$FILENAME" "\$INSTALL_DIR/baid-ci\$EXT"; then
             echo -e "\${RED}Error: Failed to install BAID-CI\${NC}"
             echo -e "\${YELLOW}Try running with sudo:\${NC} sudo bash -c \"\$(curl -fsSL \$BUCKET_URL/\$VERSION/install.sh)\""
+            echo -e "\${YELLOW}Or specify a different directory:\${NC} curl -fsSL \$BUCKET_URL/\$VERSION/install.sh | bash -s -- -d ~/bin"
             exit 1
         fi
         
@@ -346,7 +425,7 @@ jobs:
         verbose: true
 
   upload-to-gcs:
-    needs: [build-linux-x86_64, build-macos, generate-install-script]
+    needs: [build-linux-x86_64, build-linux-arm64, build-macos-x86_64, build-macos-arm64, generate-install-script]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -362,17 +441,33 @@ jobs:
     - name: 'Set up Cloud SDK'
       uses: 'google-github-actions/setup-gcloud@v2'
 
+    # Create dist directory
+    - name: Create dist directory
+      run: mkdir -p dist
+
     # Download all artifacts
-    - name: Download Linux executable
+    - name: Download Linux x86_64 executable
       uses: actions/download-artifact@v4
       with:
         name: linux-x86_64-executable
         path: dist/
 
-    - name: Download macOS executable
+    - name: Download Linux ARM64 executable
+      uses: actions/download-artifact@v4
+      with:
+        name: linux-arm64-executable
+        path: dist/
+
+    - name: Download macOS x86_64 executable
       uses: actions/download-artifact@v4
       with:
         name: macos-x86_64-executable
+        path: dist/
+
+    - name: Download macOS ARM64 executable
+      uses: actions/download-artifact@v4
+      with:
+        name: macos-arm64-executable
         path: dist/
 
     - name: Download install script
@@ -404,14 +499,18 @@ jobs:
         # Upload to version-specific folder
         echo "Uploading to ${{ steps.version.outputs.VERSION }} folder..."
         gsutil -m cp dist/baid-ci-linux-x86_64 gs://${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/
+        gsutil -m cp dist/baid-ci-linux-arm64 gs://${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/
         gsutil -m cp dist/baid-ci-macos-x86_64 gs://${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/
+        gsutil -m cp dist/baid-ci-macos-arm64 gs://${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/
         gsutil -m cp dist/install.sh gs://${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/
         
         # If this is a tag release, also update the 'latest' folder
         if [[ "$GITHUB_REF" == refs/tags/* ]]; then
           echo "Updating latest folder..."
           gsutil -m cp dist/baid-ci-linux-x86_64 gs://${{ env.GCS_BUCKET }}/latest/
+          gsutil -m cp dist/baid-ci-linux-arm64 gs://${{ env.GCS_BUCKET }}/latest/
           gsutil -m cp dist/baid-ci-macos-x86_64 gs://${{ env.GCS_BUCKET }}/latest/
+          gsutil -m cp dist/baid-ci-macos-arm64 gs://${{ env.GCS_BUCKET }}/latest/
           gsutil -m cp dist/install.sh gs://${{ env.GCS_BUCKET }}/latest/
         fi
         
@@ -432,8 +531,10 @@ jobs:
         
         # Print URLs for binaries and installer
         echo "✅ Files uploaded successfully!"
-        echo "📦 Linux binary: https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/baid-ci-linux-x86_64"
-        echo "📦 macOS binary: https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/baid-ci-macos-x86_64"
+        echo "📦 Linux x86_64: https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/baid-ci-linux-x86_64"
+        echo "📦 Linux ARM64: https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/baid-ci-linux-arm64"
+        echo "📦 macOS x86_64: https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/baid-ci-macos-x86_64"
+        echo "📦 macOS ARM64: https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/baid-ci-macos-arm64"
         echo "📜 Installer: https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ steps.version.outputs.VERSION }}/install.sh"
         
         echo "👉 Installation command:"
@@ -472,9 +573,16 @@ jobs:
           
           ## Direct Download Links
           
-          - Linux (x86_64): [baid-ci-linux-x86_64](https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ github.ref_name }}/baid-ci-linux-x86_64)
-          - macOS (x86_64): [baid-ci-macos-x86_64](https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ github.ref_name }}/baid-ci-macos-x86_64)
-          - Installation Script: [install.sh](https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ github.ref_name }}/install.sh)
+          ### Linux
+          - x86_64 (Intel/AMD): [baid-ci-linux-x86_64](https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ github.ref_name }}/baid-ci-linux-x86_64)
+          - ARM64 (Raspberry Pi/ARM servers): [baid-ci-linux-arm64](https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ github.ref_name }}/baid-ci-linux-arm64)
+          
+          ### macOS
+          - Intel (x86_64): [baid-ci-macos-x86_64](https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ github.ref_name }}/baid-ci-macos-x86_64)
+          - Apple Silicon (ARM64): [baid-ci-macos-arm64](https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ github.ref_name }}/baid-ci-macos-arm64)
+          
+          ### Installation Script
+          - [install.sh](https://storage.googleapis.com/${{ env.GCS_BUCKET }}/${{ github.ref_name }}/install.sh)
           
           ## Latest Version
           
@@ -482,6 +590,22 @@ jobs:
           
           ```bash
           curl -fsSL https://storage.googleapis.com/${{ env.GCS_BUCKET }}/latest/install.sh | bash
+          ```
+          
+          ### Installing for a Specific Architecture
+          
+          If you want to force a specific architecture (e.g., installing x86_64 on an ARM machine):
+          
+          ```bash
+          curl -fsSL https://storage.googleapis.com/${{ env.GCS_BUCKET }}/latest/install.sh | bash -s -- --force-arch x86_64
+          ```
+          
+          ### Installing to a Custom Directory
+          
+          To install to a directory in your home folder (no sudo required):
+          
+          ```bash
+          curl -fsSL https://storage.googleapis.com/${{ env.GCS_BUCKET }}/latest/install.sh | bash -s -- --dir ~/bin
           ```
         draft: false
         prerelease: false
