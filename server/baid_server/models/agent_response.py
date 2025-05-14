@@ -1,7 +1,6 @@
 import json
 import re
 from baid_server.core.models import JetbrainsResponse
-import logging 
 
 def parse_agent_response(response_chunk):
     if isinstance(response_chunk, bytes):
