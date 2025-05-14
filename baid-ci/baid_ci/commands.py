@@ -57,47 +57,26 @@ def process_streaming_response(response) -> Dict:
     """Process the streaming response from the API (SSE)"""
     result = {}
     session_id = None
-    line_count = 0
     debug_print = False
-    # Process each SSE message
-    for line in response.iter_lines():
-        if not line:
-            continue
-        line = line.decode('utf-8')
-        line_count += 1
-        if debug_print:
-            print(f"DEBUG: Raw SSE line #{line_count}: {line[:100]}")
-        if line.startswith(':'):
-            continue
-        if line.startswith('data:'):
-            data = line[5:].strip()
-            if debug_print:
-                print(f"DEBUG: SSE data #{line_count}: {data[:100]}")
-            if data == '[DONE]':
-                break
-            try:
-                json_data = json.loads(data)
-                if debug_print:
-                    print(f"DEBUG: Parsed JSON #{line_count}: {str(json_data)[:100]}")
-                if "session_id" in json_data:
-                    session_id = json_data["session_id"]
-                    result["session_id"] = session_id
-                    continue
-                for field in ["solution", "explanation", "code_change"]:
-                    if field in json_data and json_data[field]:
-                        result[field] = json_data[field]
-                if "blocks" in json_data:
-                    result["blocks"] = json_data["blocks"]
-                if "all_blocks" in json_data:
-                    result["all_blocks"] = json_data["all_blocks"]
-            except json.JSONDecodeError:
-                if debug_print:
-                    print(f"DEBUG: Could not parse line #{line_count} as JSON: {data}")
-                result["explanation"] = data
+    full_text = ""
+
+    data = response.content.decode('utf-8')
+    if 'data:' in data:
+        full_text += data.split('data:')[1].strip()
+        print("full_text: ", full_text)
+          
+    # If we've collected text content and don't have an explanation yet
+    if full_text and "explanation" not in result:
+        result["explanation"] = full_text
+    
+    # Ensure session_id is included if we found one
     if session_id and "session_id" not in result:
         result["session_id"] = session_id
+        
+    # Default response if nothing was found
     if not result:
         result = {"solution": "No structured response received", "explanation": "No output from CI analysis agent."}
+        
     return result
 
 

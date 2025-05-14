@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 
 class ResponseParser:
     @staticmethod
-    async def process_incoming_chunk(response: JetbrainsResponse) -> Optional[str]:
+    async def process_incoming_chunk(event) -> Optional[str]:
         try:
             # Extract blocks from the cleaned JSON
-            blocks = ResponseParser.extract_blocks(response)
+            blocks = ResponseParser.extract_blocks(JetbrainsResponse(**event))
             if blocks:
                 # Process all blocks and combine them into a single SSE message
                 all_blocks_data = []

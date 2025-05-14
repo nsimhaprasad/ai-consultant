@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from baid_server.api.dependencies import get_current_user
 from baid_server.models.ci_error import CIErrorRequest
+from baid_server.models.agent_response import parse_ci_response
 
 # --- Vertex AI ADK imports ---
 from vertexai import agent_engines
@@ -68,7 +69,8 @@ Focus on being practical and specific with your solution.
                 "session_id": session_id,
             }
         )
-        execution_client = ReasoningEngineExecutionServiceClient()
+        api_endpoint = f"{os.getenv('LOCATION', 'us-central1')}-aiplatform.googleapis.com"
+        execution_client = ReasoningEngineExecutionServiceClient(client_options={"api_endpoint": api_endpoint})
         stream_response = execution_client.stream_query_reasoning_engine(stream_request)
         import functools
         import asyncio
@@ -76,30 +78,38 @@ Focus on being practical and specific with your solution.
         async def ci_stream():
             logger.info(f"[{request_id}] Streaming agent response...")
             loop = asyncio.get_event_loop()
-            def get_chunks():
-                for chunk in stream_response:
-                    yield chunk
-            chunk_iter = get_chunks()
-            while True:
-                chunk = await loop.run_in_executor(None, lambda: next(chunk_iter, None))
-                if chunk is None:
-                    break
-                chunk_dict = chunk._pb.__class__.to_dict(chunk._pb)
-                logger.debug(f"[{request_id}] Agent chunk: {json.dumps(chunk_dict)[:200]}")
-                if "error_code" in chunk_dict and "error_message" in chunk_dict:
-                    error_msg = f"Agent Error ({chunk_dict['error_code']}): {chunk_dict['error_message']}"
-                    logger.error(f"[{request_id}] Agent returned error: {error_msg}")
-                    yield f"data: {{\"error\": \"{error_msg}\"}}\n\n"
-                    continue
-                content = chunk_dict.get("data", "") or chunk_dict.get("content", "")
-                if content:
-                    yield f"data: {{\"solution\": {json.dumps(content)} }}\n\n"
+            for idx, event in enumerate(parse_ci_response(stream_response)):
+                logger.info(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
+                print(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
+                full_response += str(event)
+                # Detect and surface agent errors
+                try:
+                    # Try to extract error from JSON event
+                    if isinstance(event, str):
+                        event_data = json.loads(event)
+                    else:
+                        event_data = event
+                    if isinstance(event_data, dict) and event_data.get("error_code") and event_data.get("error_message"):
+                        error_msg = f"Agent Error ({event_data['error_code']}): {event_data['error_message']}"
+                        logger.error(f"[{request_id}] Agent returned error: {error_msg}")
+                        yield f"data: {{\"error\": \"{error_msg}\"}}\n\n"
+                        continue
+                except Exception as parse_exc:
+                    logger.warning(f"[{request_id}] Could not parse event for error: {parse_exc}")
+                # Process chunks as they come in
+                sse_data = await ResponseParser.process_incoming_chunk(event)
+                logger.info(f"[{request_id}] Processed SSE data: {repr(sse_data)}")
+                if sse_data:
+                    yield sse_data
+                    await asyncio.sleep(0.05)
             yield "data: [DONE]\n\n"
+            print("done")
         return StreamingResponse(ci_stream(), media_type="text/event-stream")
     except Exception as e:
         logger.error(f"[{request_id}] Error in CI error analysis: {str(e)}", exc_info=True)
         error_msg = str(e)
         async def error_stream():
+            print("error_msg: ", error_msg)
             yield f"data: {{\"solution\": \"Internal server error\", \"explanation\": \"{error_msg}\"}}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(error_stream(), media_type="text/event-stream")
