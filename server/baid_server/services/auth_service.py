@@ -17,7 +17,7 @@ GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "https://core.baid.dev/api/auth/google-login")
 
 # JWT configuration
-JWT_SECRET = os.environ.get("JWT_SECRET", "")
+JWT_SECRET = os.environ.get("JWT_SECRET", "a-string-secret-at-least-256-bits-long")
 JWT_ALGORITHM = "HS256"
 
 # In-memory session storage
@@ -95,14 +95,14 @@ class AuthService:
                 "picture": userinfo.get("picture"),
                 "error": None
             }
-            
+
             oauth_sessions[state] = session_data
-            
+
             # Set up cleanup timer
             Timer(OAUTH_SESSION_TTL, cleanup_state, args=[state]).start()
-            
+
             return session_data
-            
+
         except Exception as e:
             logger.error(f"Error in Google OAuth code exchange: {str(e)}")
             return {
@@ -118,3 +118,27 @@ class AuthService:
         # I'm leaving this as a stub that will need to be implemented
         logger.warning("reCAPTCHA verification not implemented")
         return True  # For now, return True to avoid breaking the application
+
+    """
+    Extensions to AuthService for API key-based authentication.
+    These methods should be added to the existing AuthService class.
+    """
+
+    def create_jwt_token(self, user_id: str, email: str, name: str, expires_in_hours: int = 8):
+        """Create a JWT token for the specified user."""
+        from datetime import datetime, timedelta, timezone
+        from jose import jwt
+        import os
+
+        JWT_SECRET = os.environ.get("JWT_SECRET", "a-string-secret-at-least-256-bits-long")
+        JWT_ALGORITHM = "HS256"
+
+        # Create JWT token
+        token = jwt.encode({
+            "sub": user_id,
+            "email": email,
+            "name": name,
+            "exp": (datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)).timestamp()
+        }, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+        return token

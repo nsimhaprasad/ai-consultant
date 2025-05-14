@@ -35,6 +35,10 @@ class AgentConfig:
     @property
     def reasoning_engine_app_name(self) -> str:
         """Get the reasoning engine app name."""
+        if not self.agent_engine_id_only:
+            raise ValueError(
+                "AGENT_ENGINE_ID is not set or is invalid. Please set the AGENT_ENGINE_ID environment variable to a valid Vertex AI Agent resource ID."
+            )
         return self.agent_engine_id_only
 
 
@@ -152,20 +156,38 @@ class AgentService:
 
             stream_response = self.execution_client.stream_query_reasoning_engine(stream_request)
 
-            for event in parse_agent_stream(stream_response):
-                print("Started streaming response")
+            for idx, event in enumerate(parse_agent_stream(stream_response)):
+                logger.info(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
+                print(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
                 full_response += str(event)
+                # Detect and surface agent errors
+                try:
+                    # Try to extract error from JSON event
+                    if isinstance(event, str):
+                        event_data = json.loads(event)
+                    else:
+                        event_data = event
+                    if isinstance(event_data, dict) and event_data.get("error_code") and event_data.get("error_message"):
+                        error_msg = f"Agent Error ({event_data['error_code']}): {event_data['error_message']}"
+                        logger.error(f"[{request_id}] Agent returned error: {error_msg}")
+                        yield f"data: {{\"error\": \"{error_msg}\"}}\n\n"
+                        continue
+                except Exception as parse_exc:
+                    logger.warning(f"[{request_id}] Could not parse event for error: {parse_exc}")
                 # Process chunks as they come in
                 sse_data = await ResponseParser.process_incoming_chunk(event)
+                logger.info(f"[{request_id}] Processed SSE data: {repr(sse_data)}")
                 if sse_data:
                     yield sse_data
                     await asyncio.sleep(0.05)
 
             # Send session_id and final marker
             session_data = f"data: {{\"session_id\": \"{session_id}\"}}\n\n"
+            logger.info(f"[{request_id}] Yielding session data: {session_data}")
             yield session_data
 
             final_marker = "data: [DONE]\n\n"
+            logger.info(f"[{request_id}] Yielding final marker: {final_marker}")
             yield final_marker
 
             # Store the complete response
