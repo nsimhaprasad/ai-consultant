@@ -3,7 +3,6 @@ import re
 from baid_server.core.models import JetbrainsResponse
 import logging 
 
-logger = logging.getLogger(__name__)
 def parse_agent_response(response_chunk):
     if isinstance(response_chunk, bytes):
         chunk_str = response_chunk.decode('utf-8')
@@ -41,7 +40,7 @@ def parse_agent_stream(stream_response):
 
             yield agent_response
         except ValueError as e:
-            logger.warning(f"Could not parse agent response: {e}")
+            print(f"Could not parse agent response: {e}")
             continue
 
 def parse_ci_response(stream_response):
@@ -51,5 +50,5 @@ def parse_ci_response(stream_response):
 
             yield ci_response
         except ValueError as e:
-            logger.warning(f"Could not parse CI response: {e}")
+            print(f"Could not parse CI response: {e}")
             continue
