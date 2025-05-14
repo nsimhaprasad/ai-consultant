@@ -1,4 +1,4 @@
-"""Command-line interface for BAID-CI
+"""Command-line interface for BAID-CI with API key support
 
 This module provides the command-line interface for the BAID-CI tool.
 """
@@ -11,7 +11,7 @@ from typing import List, Optional
 
 from . import __version__
 from .auth import Config, ensure_authenticated
-from .commands import execute_command, analyze_error, print_analysis
+from .commands import execute_command, run_ci_analysis, print_analysis
 
 # Configure logging
 logging.basicConfig(
@@ -45,7 +45,7 @@ def run_with_analysis(config, command: str) -> int:
     print("\nCommand failed with exit code", exit_code)
 
     # Analyze and show the error
-    analysis = analyze_error(config, command, stdout, stderr)
+    analysis = run_ci_analysis(command, stdout, stderr, config)
     print_analysis(analysis)
     return exit_code
 
@@ -53,7 +53,7 @@ def run_with_analysis(config, command: str) -> int:
 def print_version() -> None:
     """Print the version information for BAID-CI"""
     print(f"BAID-CI v{__version__}")
-    print("Copyright © 2025 Beskar AI Technologies")
+    print("Copyright 2025 Beskar AI Technologies")
     print("Licensed for individual use only")
     print("https://baid.dev")
 
@@ -62,12 +62,13 @@ def print_usage() -> None:
     """Print usage information"""
     print("\nUsage:")
     print("  baid-ci run COMMAND")
-    print("  baid-ci login")
+    print("  baid-ci login [--api-key KEY]")
     print("  baid-ci logout")
     print("  baid-ci version")
     print("\nExamples:")
     print("  baid-ci run \"npm install\"")
     print("  baid-ci run \"pytest tests/\"")
+    print("  baid-ci login --api-key YOUR_API_KEY")
 
 
 def parse_arguments(args: List[str]) -> argparse.Namespace:
@@ -79,7 +80,8 @@ def parse_arguments(args: List[str]) -> argparse.Namespace:
 Examples:
   baid-ci run "npm install"                    Run npm install and analyze any errors
   baid-ci run "pytest tests/"                  Run pytest and analyze any errors
-  baid-ci login                                Force a new login
+  baid-ci login                                Interactive login with browser authentication
+  baid-ci login --api-key YOUR_API_KEY         Non-interactive login with API key
   baid-ci logout                               Log out and remove stored credentials
   baid-ci version                              Show version information
         """
@@ -92,7 +94,8 @@ Examples:
     run_parser.add_argument("cmd", help="The command to run", nargs="+")
 
     # Login command
-    subparsers.add_parser("login", help="Log in to BAID.dev")
+    login_parser = subparsers.add_parser("login", help="Log in to BAID.dev")
+    login_parser.add_argument("--api-key", help="API key for non-interactive authentication", required=False)
 
     # Logout command
     subparsers.add_parser("logout", help="Log out from BAID.dev")
@@ -144,10 +147,17 @@ def main(args: Optional[List[str]] = None) -> int:
 
     # Handle commands
     if parsed_args.command == "login":
-        # Force new login
-        config.reset()
-        if ensure_authenticated(config):
+        # Check if API key is provided
+        api_key = parsed_args.api_key
+        use_api_key = api_key is not None
+
+        # For API key login, we want to force a new login
+        if use_api_key:
+            config.reset()
+
+        if ensure_authenticated(config, use_api_key=use_api_key, api_key=api_key):
             print(f"Successfully logged in as {config.user_email}")
+            print(f"Authentication type: {'API Key' if config.auth_type == 'api_key' else 'OAuth'}")
         else:
             print("Login failed")
         return 0

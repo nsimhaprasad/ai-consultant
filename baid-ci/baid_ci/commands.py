@@ -4,6 +4,7 @@ This module handles executing commands, analyzing errors, and presenting results
 """
 
 import json
+import os
 import subprocess
 import sys
 from typing import Dict, Tuple, Optional
@@ -12,7 +13,7 @@ import requests
 from .spinner import Spinner
 
 # Constants
-CONSULT_URL = "https://core.baid.dev/consult"
+CI_ANALYZE_URL = os.environ.get("BAID_CI_ANALYZE_URL", "http://localhost:8080/api/ci/analyze")
 
 
 def execute_command(command: str) -> Tuple[int, str, str]:
@@ -53,189 +54,58 @@ def execute_command(command: str) -> Tuple[int, str, str]:
 
 
 def process_streaming_response(response) -> Dict:
-    """Process the streaming response from the API"""
-    buffer = ""
+    """Process the streaming response from the API (SSE)"""
     result = {}
     session_id = None
-    line_count = 0
-    block_count = 0
+    debug_print = False
+    full_text = ""
 
-    # Process each SSE message
-    for line in response.iter_lines():
-        if not line:
-            continue
-
-        line = line.decode('utf-8')
-        line_count += 1
-
-        # Skip comments
-        if line.startswith(':'):
-            continue
-
-        # Handle data lines
-        if line.startswith('data:'):
-            data = line[5:].strip()
-
-            # Handle final message
-            if data == '[DONE]':
-                break
-
-            try:
-                json_data = json.loads(data)
-
-                # Handle session ID
-                if "session_id" in json_data:
-                    session_id = json_data["session_id"]
-                    result["session_id"] = session_id
-                    continue
-
-                # Handle error
-                if "error" in json_data:
-                    result["error"] = json_data["error"]
-                    continue
-
-                # Handle direct blocks array at the top level
-                if "blocks" in json_data:
-                    blocks = json_data.get("blocks", [])
-                    block_count += len(blocks)
-
-                    # Store blocks for rendering
-                    if "all_blocks" not in result:
-                        result["all_blocks"] = []
-
-                    # Append blocks to our collected blocks
-                    result["all_blocks"].extend(blocks)
-
-                    # Process code blocks
-                    for block in blocks:
-                        if block["type"] == "code" and "code_change" not in result:
-                            result["code_change"] = block["content"]
-
-                # Handle content blocks inside content object
-                elif "content" in json_data:
-                    content = json_data.get("content", {})
-
-                    if "solution" in content:
-                        result["solution"] = content["solution"]
-
-                    if "explanation" in content:
-                        result["explanation"] = content["explanation"]
-
-                    # Process blocks
-                    if "blocks" in content:
-                        blocks = content["blocks"]
-                        block_count += len(blocks)
-
-                        # Collect all blocks for rendering
-                        if "all_blocks" not in result:
-                            result["all_blocks"] = []
-                        result["all_blocks"].extend(blocks)
-
-                        # Process code blocks
-                        for block in blocks:
-                            if block["type"] == "code" and "code_change" not in result:
-                                result["code_change"] = block["content"]
-            except json.JSONDecodeError:
-                # If not valid JSON, just append to buffer
-                buffer += data
-
-    # If we haven't extracted structured data, try to parse the buffer
-    if not result and buffer:
-        try:
-            result = json.loads(buffer)
-        except:
-            result = {
-                "solution": "Unstructured response received",
-                "explanation": buffer
-            }
-
-    # Ensure session_id is included in the result
+    data = response.content.decode('utf-8')
+    if 'data:' in data:
+        full_text += data.split('data:')[1].strip()
+        print("full_text: ", full_text)
+          
+    # If we've collected text content and don't have an explanation yet
+    if full_text and "explanation" not in result:
+        result["explanation"] = full_text
+    
+    # Ensure session_id is included if we found one
     if session_id and "session_id" not in result:
         result["session_id"] = session_id
-
+        
+    # Default response if nothing was found
+    if not result:
+        result = {"solution": "No structured response received", "explanation": "No output from CI analysis agent."}
+        
     return result
 
 
-def analyze_error(config, command: str, stdout: str, stderr: str) -> Dict:
-    """Analyze the error using BAID.dev API with spinner to show progress"""
-    print("\nAnalyzing error with BAID.dev AI...")
-
-    # Prepare the prompt for the API
-    prompt = f"""
-I'm facing an error in my CI pipeline. Please help me fix it.
-
-## Command
-```
-{command}
-```
-
-## Standard Output
-```
-{stdout}
-```
-
-## Error Output
-```
-{stderr}
-```
-
-Please analyze this error and provide a solution. Focus on the specific issue in the CI pipeline.
-"""
-
-    # Prepare the request data
+def run_ci_analysis(command, stdout, stderr, config):
+    """Run CI error analysis by POSTing to /api/ci/analyze and returning the parsed result."""
+    endpoint = CI_ANALYZE_URL
     request_data = {
-        "prompt": prompt,
-        "context": {
-            "is_open": False
-        }
+        "command": command,
+        "stdout": stdout,
+        "stderr": stderr,
+        "environment": getattr(config, 'environment', None),
+        "metadata": getattr(config, 'metadata', None)
     }
-
-    # Make the API request
-    headers = {
-        "Authorization": f"Bearer {config.token}",
-        "Content-Type": "application/json"
-    }
-
-    if config.session_id:
-        headers["session_id"] = config.session_id
-
+    headers = {"Content-Type": "application/json"}
+    # Attach authentication if available
+    token = getattr(config, 'token', None)
+    auth_type = getattr(config, 'auth_type', None)
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     try:
-        # Start spinner for visual feedback
-        spinner = Spinner("Thinking ")
-        spinner.start()
-
-        try:
-            response = requests.post(
-                CONSULT_URL,
-                headers=headers,
-                json=request_data,
-                stream=True  # Stream the response
-            )
-
-            if response.status_code != 200:
-                spinner.stop()
-                return {
-                    "solution": f"API error: {response.text}",
-                    "explanation": "Failed to get a response from BAID.dev"
-                }
-
-            # Process the streaming response
-            analysis_result = process_streaming_response(response)
-
-            # Save the session ID for future requests if it's in the response
-            if "session_id" in analysis_result:
-                config.session_id = analysis_result["session_id"]
-                config.save()
-        finally:
-            # Make sure we stop the spinner in any case
-            spinner.stop()
-
+        print(f"Sending CI error analysis request to {endpoint}")
+        response = requests.post(endpoint, headers=headers, data=json.dumps(request_data), stream=True)
+        if response.status_code != 200:
+            error_text = response.text[:200] + "..." if len(response.text) > 200 else response.text
+            return {"solution": f"API error: HTTP {response.status_code}", "explanation": f"Failed to get a response from BAID.dev:\n{error_text}"}
+        analysis_result = process_streaming_response(response)
         return analysis_result
-    except Exception as e:
-        return {
-            "solution": "Could not analyze error. Network or API error occurred.",
-            "explanation": f"Exception: {str(e)}"
-        }
+    finally:
+        pass
 
 
 def print_analysis(analysis: Dict) -> None:

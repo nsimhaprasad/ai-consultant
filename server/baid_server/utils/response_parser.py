@@ -11,11 +11,10 @@ logger = logging.getLogger(__name__)
 
 class ResponseParser:
     @staticmethod
-    async def process_incoming_chunk(response: JetbrainsResponse) -> AsyncGenerator[str, None]:
+    async def process_incoming_chunk(event) -> Optional[str]:
         try:
             # Extract blocks from the cleaned JSON
-            blocks = ResponseParser.extract_blocks(response)
-            print("Blocks extracted:", blocks)
+            blocks = ResponseParser.extract_blocks(JetbrainsResponse(**event))
             if blocks:
                 for block in blocks:
                     # Format each block

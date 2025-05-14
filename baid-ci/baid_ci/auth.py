@@ -1,6 +1,6 @@
-"""Authentication module for BAID-CI
+"""Authentication module for BAID-CI with API key support
 
-This module handles Google OAuth authentication and token management.
+This module handles both Google OAuth authentication and API key authentication.
 """
 
 import json
@@ -11,9 +11,11 @@ import secrets
 from urllib.parse import parse_qs, urlparse, quote
 import requests
 from cryptography.fernet import Fernet
+import getpass
 
 # Constants
-BASE_URL = "https://core.baid.dev"
+# BASE_URL = "https://core.baid.dev"
+BASE_URL = "http://localhost:8080"
 GOOGLE_CLIENT_ID = "742371152853-usfgd7l7ccp3mkekku8ql3iol5m3d7oi.apps.googleusercontent.com"
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
 REDIRECT_URI = f"{BASE_URL}/api/auth/google-login"
@@ -46,6 +48,7 @@ class Config:
         self.user_email = None
         self.user_name = None
         self.session_id = None
+        self.auth_type = "oauth"  # "oauth" or "api_key"
         self.cipher = Fernet(get_encryption_key())
         self.load()
 
@@ -67,6 +70,7 @@ class Config:
                     self.user_email = data.get("user_email")
                     self.user_name = data.get("user_name")
                     self.session_id = data.get("session_id")
+                    self.auth_type = data.get("auth_type", "oauth")  # Default to oauth for backward compatibility
             except Exception as e:
                 print(f"Error loading config: {e}")
                 self.reset()
@@ -86,7 +90,8 @@ class Config:
                     "token_expiry": self.token_expiry,
                     "user_email": self.user_email,
                     "user_name": self.user_name,
-                    "session_id": self.session_id
+                    "session_id": self.session_id,
+                    "auth_type": self.auth_type
                 }, f)
 
             # Set appropriate permissions
@@ -102,6 +107,7 @@ class Config:
         self.user_email = None
         self.user_name = None
         self.session_id = None
+        self.auth_type = "oauth"
 
         # Remove config file if it exists
         if os.path.exists(CONFIG_FILE):
@@ -213,17 +219,65 @@ def authenticate_with_google():
         return None
 
 
-def ensure_authenticated(config):
+def authenticate_with_api_key(api_key=None):
+    """Authenticate using an API key instead of OAuth"""
+    try:
+        # If API key is not provided, prompt for it
+        if not api_key:
+            api_key = getpass.getpass("Enter your BAID-CI API key: ")
+
+        # Make the API request to authenticate with the key
+        response = requests.post(
+            f"{BASE_URL}/api/auth/api-key",
+            headers={
+                "api-key": api_key,
+                "Content-Type": "application/json"
+            }
+        )
+
+        if response.status_code != 200:
+            print(f"API key authentication failed: {response.text}")
+            return None
+
+        auth_data = response.json()
+        return {
+            "token": auth_data["access_token"],
+            "expires_in": auth_data["expires_in"],
+            "user_email": auth_data["email"],
+            "user_name": auth_data["name"],
+            "auth_type": "api_key"
+        }
+
+    except Exception as e:
+        print(f"API key authentication error: {e}")
+        return None
+
+
+def ensure_authenticated(config, use_api_key=False, api_key=None):
     """Ensure user is authenticated, refresh token if needed"""
     # Check if token exists and is valid
     if not config.token or time.time() >= config.token_expiry:
         # Token is missing or expired, need to authenticate
-        auth_result = authenticate_with_google()
+        if use_api_key:
+            auth_result = authenticate_with_api_key(api_key)
+            if auth_result:
+                config.auth_type = "api_key"
+            else:
+                return False
+        else:
+            # Use existing auth type or default to OAuth
+            if config.auth_type == "api_key":
+                auth_result = authenticate_with_api_key(api_key)
+            else:
+                auth_result = authenticate_with_google()
+
         if auth_result:
             config.token = auth_result["token"]
             config.token_expiry = time.time() + auth_result["expires_in"]
             config.user_email = auth_result["user_email"]
             config.user_name = auth_result["user_name"]
+            if "auth_type" in auth_result:
+                config.auth_type = auth_result["auth_type"]
             config.save()
             return True
         return False
