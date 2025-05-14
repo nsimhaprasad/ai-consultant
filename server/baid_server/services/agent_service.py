@@ -158,7 +158,6 @@ class AgentService:
 
             for idx, event in enumerate(parse_agent_stream(stream_response)):
                 logger.info(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
-                print(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
                 full_response += str(event)
                 # Detect and surface agent errors
                 try:
@@ -175,11 +174,11 @@ class AgentService:
                 except Exception as parse_exc:
                     logger.warning(f"[{request_id}] Could not parse event for error: {parse_exc}")
                 # Process chunks as they come in
-                sse_data = await ResponseParser.process_incoming_chunk(event)
-                logger.info(f"[{request_id}] Processed SSE data: {repr(sse_data)}")
-                if sse_data:
-                    yield sse_data
-                    await asyncio.sleep(1)
+                async for sse_data in ResponseParser.process_incoming_chunk(event):
+                    logger.info(f"[{request_id}] Processed SSE data: {repr(sse_data)}")
+                    if sse_data:
+                        yield sse_data
+                        await asyncio.sleep(1)
 
             # Send session_id and final marker
             session_data = f"data: {{\"session_id\": \"{session_id}\"}}\n\n"

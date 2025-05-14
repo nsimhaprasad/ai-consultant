@@ -18,11 +18,10 @@ class ResponseParser:
             if blocks:
                 for block in blocks:
                     # Format each block
-                    formatted_block = ResponseParser.format_block_for_sse(block, include_sse_format=False)
+                    formatted_block = ResponseParser.format_block_for_sse(block, include_sse_format=True)
                     if formatted_block:
                         # Stream each block individually
-                        print("Formatted block:", formatted_block)
-                        yield f"data: {formatted_block}\n\n"
+                        yield formatted_block
         except Exception as e:
             logger.debug(f"Error processing chunk: {str(e)}")
 
@@ -33,7 +32,6 @@ class ResponseParser:
             return [block.dict() for block in response.response.content.blocks]
         except (json.JSONDecodeError, ValidationError, Exception) as e:
             # If complete parsing fails, try to extract blocks using regex
-            print("JSON parsing error:", e)
             logger.debug(f"JSON parsing error: {e}")
             import re
             blocks = []
@@ -104,13 +102,4 @@ class ResponseParser:
                 return block_obj  # Return the block object directly for combining
         except Exception as e:
             logger.debug(f"Error formatting block for SSE: {str(e)}")
-            return None
-
-    @staticmethod
-    def parse_jetbrains_response(json_data: str) -> Optional[JetbrainsResponse]:
-        try:
-            response_data = json.loads(json_data)
-            return JetbrainsResponse(**response_data)
-        except (json.JSONDecodeError, ValidationError) as e:
-            logger.error(f"Error parsing JetbrainsResponse: {str(e)}")
             return None
