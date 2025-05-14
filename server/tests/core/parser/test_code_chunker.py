@@ -16,7 +16,6 @@ def bar(y):
     chunker = CodeChunker()
     chunks = await chunker.process_file(file_path, code)
 
-    print("chunks", chunks)
     # Should extract two function chunks
     assert isinstance(chunks, list)
     assert len(chunks) == 2
@@ -43,7 +42,6 @@ async def test_process_file_empty_content():
     file_path = "empty.py"
     chunker = CodeChunker()
     chunks = await chunker.process_file(file_path, code)
-    print("chunks", chunks)
     assert chunks == []
 
 
@@ -59,7 +57,6 @@ class Foo:
     file_path = "foo.py"
     chunker = CodeChunker()
     chunks = await chunker.process_file(file_path, code)
-    print("chunks", chunks)
     # Should extract a class and its methods, with relationships
     class_chunk = next((c for c in chunks if c["type"] == "class_definition"), None)
     method_chunks = [c for c in chunks if c["type"] == "function_definition"]

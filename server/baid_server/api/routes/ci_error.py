@@ -7,6 +7,8 @@ from fastapi.responses import StreamingResponse
 from baid_server.api.dependencies import get_current_user
 from baid_server.models.ci_error import CIErrorRequest
 from baid_server.models.agent_response import parse_ci_response
+from baid_server.prompts.format import CI_RESPONSE_FORMAT
+from baid_server.utils.ci_response_parser import CiResponseParser
 
 # --- Vertex AI ADK imports ---
 from vertexai import agent_engines
@@ -27,7 +29,8 @@ async def analyze_ci_error(
     logger.info(f"[{request_id}] === Starting CI error analysis request ===")
     user_id = current_user["sub"]
     prompt = f"""
-I'm facing an error in my CI pipeline. Please help me fix it.
+You are a CI error analyzer.
+ I'm facing an error in my CI pipeline. Please help me fix it.
 
 ## Command
 ```
@@ -47,9 +50,14 @@ I'm facing an error in my CI pipeline. Please help me fix it.
 Please analyze this error and provide a solution. Focus on the specific issue in the CI pipeline and be very actionable.
 Your response should include:
 1. A clear explanation of what went wrong
-2. A specific solution to fix the error
-3. Code examples showing the fix if appropriate
+2. A brief explanation of the error
+3. A probable fix
 Focus on being practical and specific with your solution.
+
+Make sure your response is in the following JSON format:
+{CI_RESPONSE_FORMAT}
+
+Stream your response as a series of rfc8259 JSON format only. Do not include any other characters or formatting. Each chunk should be a valid JSON object.
 """
     try:
         # Get the agent engine
@@ -76,12 +84,12 @@ Focus on being practical and specific with your solution.
         import asyncio
         import json
         async def ci_stream():
+            full_response = ""
             logger.info(f"[{request_id}] Streaming agent response...")
             loop = asyncio.get_event_loop()
             for idx, event in enumerate(parse_ci_response(stream_response)):
                 logger.info(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
-                print(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
-                # full_response += str(event)
+                full_response += str(event)
                 # Detect and surface agent errors
                 try:
                     # Try to extract error from JSON event
@@ -96,14 +104,13 @@ Focus on being practical and specific with your solution.
                         continue
                 except Exception as parse_exc:
                     logger.warning(f"[{request_id}] Could not parse event for error: {parse_exc}")
-                # Process chunks as they come in
-                sse_data = await ResponseParser.process_incoming_chunk(event)
-                logger.info(f"[{request_id}] Processed SSE data: {repr(sse_data)}")
-                if sse_data:
-                    yield sse_data
-                    await asyncio.sleep(0.05)
+                # Process chunks as they come in - iterate through the async generator
+                async for sse_data in CiResponseParser.process_incoming_chunk(event):
+                    logger.info(f"[{request_id}] Processed SSE data: {repr(sse_data)}")
+                    if sse_data:
+                        yield sse_data
+                        await asyncio.sleep(1)
             yield "data: [DONE]\n\n"
-            print("done")
         return StreamingResponse(ci_stream(), media_type="text/event-stream")
     except Exception as e:
         logger.error(f"[{request_id}] Error in CI error analysis: {str(e)}", exc_info=True)

@@ -53,6 +53,21 @@ class CalloutBlock(BaseModel):
     content: str
 
 
+class ErrorAnalysisBlock(BaseModel):
+    """Model for an error analysis block"""
+    type: Literal["error_analysis"]
+    content: str
+
+class BriefExplanationBlock(BaseModel):
+    """Model for a brief explanation block"""
+    type: Literal["brief_explanation"]
+    content: str
+
+class ProbableFixBlock(BaseModel):
+    """Model for a probable fix block"""
+    type: Literal["probable_fix"]
+    content: str
+
 # Union of all block types
 Block = Union[
     ParagraphBlock,
@@ -60,7 +75,10 @@ Block = Union[
     ListBlock,
     CodeBlock,
     CommandBlock,
-    CalloutBlock
+    CalloutBlock,
+    ErrorAnalysisBlock,
+    BriefExplanationBlock,
+    ProbableFixBlock
 ]
 
 
@@ -92,3 +110,11 @@ class JetbrainsResponse(BaseModel):
     schema: Literal["jetbrains-llm-response"]
     version: str
     response: Response
+
+
+class CiAnalyzerResponse(BaseModel):
+    """Model for the complete CI analyzer response"""
+    schema: Literal["ci-analyzer-response"]
+    version: str
+    response: Response
+    

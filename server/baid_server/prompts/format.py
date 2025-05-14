@@ -84,3 +84,37 @@ Now I'll provide you with specific block type reference and examples...
 When responding to user questions, always output a valid JSON structure as specified. Do not include the JSON structure in code fences or any other markdown - the entire response should be a single, valid JSON object.
 
 """
+
+
+
+CI_RESPONSE_FORMAT = """
+{
+  "schema": "ci-analyzer-response",
+  "version": "1.0",
+  "response": {
+    "type": "content",
+    "metadata": {
+      "model": "your-model-name",
+      "timestamp": "current-ISO-datetime"
+    },
+    {
+    "content": {
+      "blocks": [
+        {
+          "type": "error_analysis",
+          "content": "This should contain a comprehensive and detailed analysis of the error. Include information about what component failed, at what stage of the pipeline the error occurred, error messages and stack traces interpretation, the context of the failure, identification of patterns, and any environmental factors that may have contributed to the failure. This analysis should be thorough and technical, identifying the root cause of the issue."
+        },
+        {
+          "type": "brief_explanation",
+          "content": "This should provide a concise, one or two sentence summary of the error that can be quickly understood by team members. It should identify the core issue without technical details but make clear what system component or process is failing and why in simple terms. This should be a maximum of 100 words."
+        },
+        {
+          "type": "probable_fix",
+          "content": "This should contain specific, actionable steps to resolve the identified issue. Include commands to run, code snippets to implement, configuration changes to make, or environmental variables to set. The fix should directly address the root cause identified in the error analysis and provide clear instructions that could be followed by any team member to resolve the issue. If multiple approaches are possible, list them in order of recommended priority."
+        }
+      ]
+    }
+  }
+}
+"""
+
