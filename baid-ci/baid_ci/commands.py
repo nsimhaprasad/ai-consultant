@@ -13,7 +13,7 @@ import requests
 from .spinner import Spinner
 
 # Constants
-CI_ANALYZE_URL = os.environ.get("BAID_CI_ANALYZE_URL", "http://localhost:8080/api/ci/analyze")
+CI_ANALYZE_URL = os.environ.get("BAID_CI_ANALYZE_URL", "https://core.baid.dev/api/ci/analyze")
 
 
 def execute_command(command: str) -> Tuple[int, str, str]:

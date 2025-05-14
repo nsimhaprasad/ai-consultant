@@ -81,7 +81,7 @@ Focus on being practical and specific with your solution.
             for idx, event in enumerate(parse_ci_response(stream_response)):
                 logger.info(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
                 print(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
-                full_response += str(event)
+                # full_response += str(event)
                 # Detect and surface agent errors
                 try:
                     # Try to extract error from JSON event
