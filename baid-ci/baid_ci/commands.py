@@ -283,14 +283,14 @@ def print_analysis(analysis: Dict) -> None:
     if "error_analysis" in analysis:
         print("\n❌ ERROR: " + analysis["error_analysis"])
 
-    print("=" * 80)
+    print("\n" + "=" * 80)
     if "brief_explanation" in analysis:
         # Format and print the explanation with markdown formatting
         explanation = analysis["brief_explanation"].strip()
         print("\n💡 BRIEF EXPLANATION:")
         print(format_markdown_for_terminal(explanation))
 
-    print("=" * 80)
+    print("\n" + "=" * 80)
     if "probable_fix" in analysis:
         # Format and print the probable fix with markdown formatting
         probable_fix = analysis["probable_fix"].strip()
