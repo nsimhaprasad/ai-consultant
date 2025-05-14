@@ -35,7 +35,7 @@ MAX_RETRIES = 10
 RETRY_DELAY = 5  # seconds
 
 # Path to migration files
-MIGRATIONS_DIR = Path("../migrations")
+MIGRATIONS_DIR = Path("/app/migrations")
 
 
 async def get_connection_string():
