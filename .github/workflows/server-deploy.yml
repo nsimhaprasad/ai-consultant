@@ -238,15 +238,15 @@ jobs:
           fi
           echo "=============================================="
 
-      # Simple direct deployment with force flag and revision tag
       - name: Deploy to Cloud Run
         run: |
           AGENT_PATH=$(cat ./server/agents/ai-consultant-agent/deployment/agent_resource.txt)
           echo "Deploying with AGENT_ENGINE_ID=$AGENT_PATH"
-          
-          # Generate a unique revision suffix
-          REVISION_SUFFIX="deploy$(date +%s)"
-          
+
+          # Generate a unique revision suffix to force a new revision
+          REVISION_SUFFIX="r$(date +%s)"
+          echo "Using unique revision suffix: $REVISION_SUFFIX"
+
           ENV_VARS=(
             "AGENT_ENGINE_ID=$AGENT_PATH"
             "GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}"
@@ -261,8 +261,8 @@ jobs:
             "ENVIRONMENT=production"
           )
           ENV_VARS_STRING=$(IFS=,; echo "${ENV_VARS[*]}")
-          
-          # Force deployment with a unique revision tag
+
+          # Deploy with a custom revision suffix to force a completely new revision
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             --region=${{ env.REGION }} \
@@ -275,12 +275,9 @@ jobs:
             --max-instances=10 \
             --concurrency=80 \
             --set-env-vars="$ENV_VARS_STRING" \
-            --revision-suffix=$REVISION_SUFFIX \
-            --force \
-            --quiet
-          
-          echo "Deployment completed with force flag and revision suffix: $REVISION_SUFFIX"
+            --revision-suffix=$REVISION_SUFFIX
 
+          echo "Deployment completed with revision suffix: $REVISION_SUFFIX"
       # Create a completion signal artifact
       - name: Signal server deployment completion
         if: ${{ github.event_name == 'workflow_run' }}
