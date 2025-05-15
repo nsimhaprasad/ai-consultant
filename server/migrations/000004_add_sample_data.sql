@@ -1,0 +1,172 @@
+-- -- migrations/000003_add_sample_data.sql
+
+-- -- Add sample users
+-- INSERT INTO users (email, name, picture) VALUES
+-- ('john.doe@example.com', 'John Doe', 'https://randomuser.me/api/portraits/men/1.jpg'),
+-- ('jane.smith@example.com', 'Jane Smith', 'https://randomuser.me/api/portraits/women/2.jpg'),
+-- ('michael.johnson@example.com', 'Michael Johnson', 'https://randomuser.me/api/portraits/men/3.jpg'),
+-- ('emily.williams@example.com', 'Emily Williams', 'https://randomuser.me/api/portraits/women/4.jpg'),
+-- ('david.brown@example.com', 'David Brown', 'https://randomuser.me/api/portraits/men/5.jpg')
+-- ON CONFLICT (email) DO NOTHING;
+
+-- -- Add sample user sessions
+-- INSERT INTO user_sessions (user_id, session_id) VALUES
+-- ('john.doe@example.com', 'session_john_1'),
+-- ('john.doe@example.com', 'session_john_2'),
+-- ('jane.smith@example.com', 'session_jane_1'),
+-- ('michael.johnson@example.com', 'session_michael_1'),
+-- ('emily.williams@example.com', 'session_emily_1'),
+-- ('david.brown@example.com', 'session_david_1')
+-- ON CONFLICT (user_id, session_id) DO NOTHING;
+
+-- -- Add sample messages (between 10-25 messages)
+-- -- John's first session messages
+-- INSERT INTO messages (user_id, session_id, role, content) VALUES
+-- ('john.doe@example.com', 'session_john_1', 'user', 'Hello, I need help with a Python problem.'),
+-- ('john.doe@example.com', 'session_john_1', 'assistant', 'Hi John! I''d be happy to help with your Python problem. What seems to be the issue?'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'user', 'I''m trying to understand list comprehensions.'),
+-- ('john.doe@example.com', 'session_john_1', 'assistant', 'List comprehensions are a concise way to create lists in Python. The basic syntax is [expression for item in iterable if condition]. Would you like me to provide some examples?');
+
+-- -- John's second session messages
+-- INSERT INTO messages (user_id, session_id, role, content) VALUES
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'user', 'I need help with a JavaScript project.'),
+-- ('john.doe@example.com', 'session_john_2', 'assistant', 'I''d be happy to help with your JavaScript project. What are you working on?');
+
+-- -- Jane's session messages
+-- INSERT INTO messages (user_id, session_id, role, content) VALUES
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'How do I set up a React project?'),
+-- ('jane.smith@example.com', 'session_jane_1', 'assistant', 'To set up a React project, you can use Create React App. Just run `npx create-react-app my-app` in your terminal. Would you like more detailed instructions?'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'user', 'Yes, please provide more details.'),
+-- ('jane.smith@example.com', 'session_jane_1', 'assistant', 'Here are the detailed steps to create and run a React application:\n1. Run `npx create-react-app my-app`\n2. Navigate to the project directory: `cd my-app`\n3. Start the development server: `npm start`\nThis will open your new app in the browser at http://localhost:3000/');
+
+-- -- Michael's session messages
+-- INSERT INTO messages (user_id, session_id, role, content) VALUES
+-- ('michael.johnson@example.com', 'session_michael_1', 'user', 'Can you help me with database design?'),
+-- ('michael.johnson@example.com', 'session_michael_1', 'assistant', 'I''d be happy to help with database design. Are you working on a specific type of database or application?'),
+-- ('michael.johnson@example.com', 'session_michael_1', 'user', 'I''m designing a database for an e-commerce site.'),
+-- ('michael.johnson@example.com', 'session_michael_1', 'assistant', 'For an e-commerce database, you''ll typically need tables for: users, products, categories, orders, order_items, and possibly reviews. Would you like me to sketch out a basic schema?');
+
+-- -- Emily's session messages
+-- INSERT INTO messages (user_id, session_id, role, content) VALUES
+-- ('emily.williams@example.com', 'session_emily_1', 'user', 'I need help with CSS Grid layout.'),
+-- ('emily.williams@example.com', 'session_emily_1', 'assistant', 'CSS Grid is a powerful layout system. What specific aspect are you struggling with?'),
+-- ('emily.williams@example.com', 'session_emily_1', 'user', 'I want to create a responsive photo gallery.'),
+-- ('emily.williams@example.com', 'session_emily_1', 'assistant', 'For a responsive photo gallery with CSS Grid, you can use:\n```css\n.gallery {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));\n  grid-gap: 1rem;\n}\n```\nThis creates a layout where each image takes up at least 250px, and the number of columns adjusts automatically based on the container width.');
+
+-- -- David's session messages
+-- INSERT INTO messages (user_id, session_id, role, content) VALUES
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'user', 'How do I deploy a Node.js app?'),
+-- ('david.brown@example.com', 'session_david_1', 'assistant', 'There are several ways to deploy a Node.js app. Popular options include Heroku, Vercel, Netlify, AWS, and Google Cloud. Which platform are you interested in?');

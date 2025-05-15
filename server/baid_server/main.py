@@ -8,7 +8,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error
+from baid_server.api.middleware import TokenLimitMiddleware
+
+from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error, users
 from baid_server.db.database import get_db_pool, close_db_pool
 from baid_server.services.service_factory import ServiceFactory
 
@@ -68,6 +70,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add token limit middleware
+app.add_middleware(TokenLimitMiddleware)
 
 
 @app.get("/")
@@ -132,6 +137,7 @@ app.include_router(waitlist)
 app.include_router(api_key)
 app.include_router(auth_api_key)
 app.include_router(ci_error)
+app.include_router(users)
 
 # Application entry point
 if __name__ == "__main__":
