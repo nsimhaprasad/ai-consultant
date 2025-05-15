@@ -146,6 +146,51 @@ async def update_token_limit(request: Request):
         )
 
 
+@router.post("/default-token-limit")
+async def update_default_token_limit(request: Request):
+    """Update the default token limit for new users."""
+    try:
+        data = await request.json()
+        token_limit = data.get("token_limit")
+        
+        if not token_limit:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Missing token_limit in request"}
+            )
+        
+        if not isinstance(token_limit, int) or token_limit < 1000:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Token limit must be an integer >= 1000"}
+            )
+        
+        # Update default token limit in database
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            # Insert or update global default token limit
+            await conn.execute(
+                """
+                INSERT INTO global_settings (setting_key, setting_value, updated_at)
+                VALUES ('default_token_limit', $1, CURRENT_TIMESTAMP)
+                ON CONFLICT (setting_key) DO UPDATE SET
+                    setting_value = $1,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                str(token_limit)
+            )
+        
+        logger.info(f"Updated default token limit for new users to {token_limit}")
+        return {"success": True, "message": f"Default token limit updated to {token_limit}"}
+    
+    except Exception as e:
+        logger.error(f"Error updating default token limit: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Internal server error: {str(e)}"}
+        )
+
+
 @router.get("/", response_class=HTMLResponse)
 async def get_users_dashboard():
     """Get a dashboard showing all users with message counts, token counts, and actions."""
@@ -157,16 +202,20 @@ async def get_users_dashboard():
         async with pool.acquire() as conn:
             # Get default token limit
             default_limit_row = await conn.fetchrow("""
-                SELECT setting_value FROM global_settings 
+                SELECT setting_value, updated_at FROM global_settings 
                 WHERE setting_key = 'default_token_limit'
             """)
             
             default_token_limit = int(default_limit_row["setting_value"]) if default_limit_row else 100000
             
-            # First get all users
+            # Set the default token limit value for the UI
+            default_token_limit_updated = default_limit_row["updated_at"] if default_limit_row else None
+            
+            # First get all users with message count and last active time
             users = await conn.fetch("""
                 SELECT u.id, u.email, u.name, u.picture, u.created_at,
-                       COUNT(m.id) as message_count
+                       COUNT(m.id) as message_count,
+                       MAX(m.timestamp) as last_active
                 FROM users u
                 LEFT JOIN messages m ON u.email = m.user_id
                 GROUP BY u.id, u.email, u.name, u.picture, u.created_at
@@ -211,6 +260,7 @@ async def get_users_dashboard():
                     "name": user["name"],
                     "picture": user["picture"],
                     "created_at": user["created_at"].isoformat() if user["created_at"] else None,
+                    "last_active": user["last_active"].isoformat() if user["last_active"] else None,
                     "message_count": user["message_count"],
                     "token_count": token_count,
                     "token_limit": token_limit,
@@ -221,7 +271,7 @@ async def get_users_dashboard():
             logger.info(f"Retrieved {len(users_data)} users for dashboard")
         
         # Generate HTML response
-        html_content = generate_users_html(users_data)
+        html_content = generate_users_html(users_data, default_token_limit)
         return HTMLResponse(content=html_content)
     
     except Exception as e:
@@ -229,7 +279,7 @@ async def get_users_dashboard():
         return HTMLResponse(content=f"<h1>Error</h1><p>{str(e)}</p>", status_code=500)
 
 
-def generate_users_html(users: List[Dict[str, Any]]) -> str:
+def generate_users_html(users: List[Dict[str, Any]], default_token_limit: int = 100000) -> str:
     """Generate HTML for the users dashboard."""
     html = """
     <!DOCTYPE html>
@@ -251,7 +301,7 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
                 margin-bottom: 20px;
             }
             .container {
-                max-width: 1200px;
+                max-width: 1400px;
                 margin: 0 auto;
             }
             .card {
@@ -287,14 +337,23 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
             }
             .action-btn {
                 display: inline-block;
-                padding: 6px 12px;
-                margin-right: 5px;
+                padding: 8px 14px;
+                margin-right: 8px;
                 background-color: #3498db;
                 color: white;
                 border-radius: 4px;
                 text-decoration: none;
                 font-size: 14px;
                 cursor: pointer;
+                border: none;
+                transition: background-color 0.2s, transform 0.1s;
+            }
+            .action-btn:hover {
+                background-color: #2980b9;
+                transform: translateY(-1px);
+            }
+            .action-btn:active {
+                transform: translateY(1px);
             }
             .action-btn.delete {
                 background-color: #e74c3c;
@@ -348,27 +407,45 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
                 color: white;
             }
             .token-limit-input {
-                width: 100px;
-                padding: 5px;
+                padding: 8px 10px;
                 border: 1px solid #ddd;
                 border-radius: 4px;
+                margin-right: 8px;
+                font-size: 14px;
+                transition: border-color 0.2s;
+                width: 120px;
+            }
+            .token-limit-input:focus {
+                border-color: #3498db;
+                outline: none;
+                box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
             }
             .save-btn {
+                display: inline-block;
+                padding: 8px 14px;
                 background-color: #2ecc71;
-                border: none;
                 color: white;
-                padding: 5px 10px;
                 border-radius: 4px;
+                text-decoration: none;
+                font-size: 14px;
                 cursor: pointer;
-                font-size: 12px;
-                margin-left: 5px;
+                border: none;
+                transition: background-color 0.2s, transform 0.1s;
+            }
+            .save-btn:hover {
+                background-color: #27ae60;
+                transform: translateY(-1px);
+            }
+            .save-btn:active {
+                transform: translateY(1px);
             }
             .bulk-actions {
-                padding: 15px;
-                margin-bottom: 20px;
+                padding: 25px;
+                margin-top: 25px;
                 background-color: #f8f9fa;
                 border-radius: 8px;
                 border: 1px solid #e0e0e0;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             }
             .bulk-actions h3 {
                 margin-top: 0;
@@ -378,14 +455,16 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
             .action-group {
                 display: flex;
                 align-items: center;
-                margin-bottom: 10px;
+                margin-bottom: 18px;
+                flex-wrap: wrap;
+                gap: 10px;
             }
             .action-group label {
                 margin-right: 10px;
                 font-weight: bold;
             }
             .action-group .action-btn {
-                margin-right: 10px;
+                margin-right: 15px;
             }
             
             /* Custom notification styles */
@@ -560,16 +639,12 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
         <div class="container">
             <h1>User Management Dashboard</h1>
             <div class="card">
-                <div class="bulk-actions">
-                    <h3>Bulk Actions</h3>
+                <div class="settings-section" style="margin-bottom: 25px; padding: 25px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                    <h3>Global Settings</h3>
                     <div class="action-group">
-                        <label for="bulk-token-limit">Set Token Limit:</label>
-                        <input type="number" id="bulk-token-limit" min="1000" step="1000" value="100000" class="token-limit-input">
-                        <button class="action-btn" onclick="applyBulkTokenLimit()">Apply to Selected</button>
-                    </div>
-                    <div class="action-group">
-                        <button class="action-btn" onclick="bulkActivateUsers()">Activate Selected</button>
-                        <button class="action-btn delete" onclick="bulkRestrictUsers()">Restrict Selected</button>
+                        <label for="default-token-limit">Default Token Limit for New Users:</label>
+                        <input type="number" id="default-token-limit" min="1000" step="1000" value="{default_token_limit}" class="token-limit-input">
+                        <button class="save-btn" onclick="saveDefaultTokenLimit()">Save Default</button>
                     </div>
                 </div>
                 <table>
@@ -579,7 +654,8 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
                             <th>Avatar</th>
                             <th>Name</th>
                             <th>Email</th>
-                            <th>Created</th>
+                            <th>Created At</th>
+                            <th>Last Active</th>
                             <th>Status</th>
                             <th>Messages</th>
                             <th>Tokens / Limit</th>
@@ -591,7 +667,51 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
         # Add rows for each user
     for user in users:
         avatar_img = f"<img src='{user['picture']}' class='user-avatar' alt='{user['name']}'>" if user['picture'] else "<div class='user-avatar'>👤</div>"
-        created_date = user['created_at'].split('T')[0] if user['created_at'] else "N/A"
+        
+        from datetime import datetime
+        
+        # Format created date with time in a more readable format
+        if user['created_at']:
+            try:
+                # If it's already a datetime object
+                if isinstance(user['created_at'], datetime):
+                    created_date = user['created_at'].strftime('%b %d, %Y %I:%M %p')  # Format: May 16, 2025 01:30 PM
+                # If it's a string (ISO format)
+                else:
+                    created_date_str = user['created_at']
+                    # Parse ISO format string to datetime
+                    if isinstance(created_date_str, str):
+                        created_date_str = created_date_str.replace('Z', '+00:00')
+                        created_dt = datetime.fromisoformat(created_date_str)
+                        created_date = created_dt.strftime('%b %d, %Y %I:%M %p')
+                    else:
+                        created_date = str(user['created_at'])
+            except Exception:
+                created_date = str(user['created_at'])
+        else:
+            created_date = "N/A"
+            
+        # Add last active date (using most recent message timestamp or N/A)
+        last_active = user.get('last_active', 'N/A')
+        if last_active and last_active != 'N/A':
+            try:
+                # If it's already a datetime object
+                if isinstance(last_active, datetime):
+                    last_active = last_active.strftime('%b %d, %Y %I:%M %p')
+                # If it's a string (ISO format)
+                else:
+                    last_active_str = last_active
+                    # Parse ISO format string to datetime
+                    if isinstance(last_active_str, str):
+                        last_active_str = last_active_str.replace('Z', '+00:00')
+                        last_active_dt = datetime.fromisoformat(last_active_str)
+                        last_active = last_active_dt.strftime('%b %d, %Y %I:%M %p')
+                    else:
+                        last_active = str(last_active)
+            except Exception:
+                last_active = str(last_active)
+        else:
+            last_active = "N/A"
         
         # Determine progress bar color based on token usage percentage
         progress_class = ""
@@ -613,7 +733,8 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
                             <td>{avatar_img}</td>
                             <td>{user['name']}</td>
                             <td>{user['email']}</td>
-                            <td>{created_date}</td>
+                            <td><span style="display: inline-block; padding: 6px 10px; background-color: #f1f8ff; border-radius: 4px; font-size: 13px;">{created_date}</span></td>
+                            <td><span style="display: inline-block; padding: 6px 10px; background-color: #f1f8ff; border-radius: 4px; font-size: 13px;">{last_active}</span></td>
                             <td><span class="status-badge {status_class}">{user['status'].capitalize()}</span></td>
                             <td><span class="badge">{user['message_count']}</span></td>
                             <td>
@@ -621,16 +742,19 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
                                 <div class="progress-container">
                                     <div class="progress-bar {progress_class}" style="width: {user['token_percentage']}%"></div>
                                 </div>
-                                <div style="margin-top: 5px;">
-                                    <input type="number" class="token-limit-input" value="{user['token_limit']}" 
-                                           data-user-id="{user['email']}" min="1000" step="1000">
-                                    <button class="save-btn" onclick="saveTokenLimit('{user['email']}')">Save</button>
-                                </div>
+
                             </td>
                             <td>
-                                <button class="action-btn {status_action_class}" onclick="toggleUserStatus('{user['email']}', '{user['status']}')">
-                                    {status_action}
-                                </button>
+                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                    <button class="action-btn {status_action_class}" onclick="toggleUserStatus('{user['email']}', '{user['status']}')">
+                                        {status_action}
+                                    </button>
+                                    <div style="display: flex; align-items: center; background-color: #f8f9fa; padding: 8px; border-radius: 6px;">
+                                        <input type="number" class="token-limit-input" value="{user['token_limit']}" 
+                                               data-user-id="{user['email']}" min="1000" step="1000" style="width: 100px;">
+                                        <button class="save-btn" onclick="saveTokenLimit('{user['email']}')">Update Limit</button>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
         """
@@ -639,6 +763,32 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
     html += """
                     </tbody>
                 </table>
+                
+                <!-- Moved bulk actions to bottom -->
+                <div class="bulk-actions">
+                    <h3 style="margin-bottom: 20px; color: #2c3e50; font-size: 20px;">Bulk Actions</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 20px;">
+                        <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <h4 style="margin-top: 0; margin-bottom: 15px; color: #3498db;">Token Management</h4>
+                            <div class="action-group">
+                                <label for="bulk-token-limit" style="font-weight: 600; margin-right: 15px;">Set Token Limit:</label>
+                                <input type="number" id="bulk-token-limit" min="1000" step="1000" value="100000" class="token-limit-input" style="width: 150px;">
+                                <button class="action-btn" onclick="applyBulkTokenLimit()" style="margin-left: 10px;">Apply to Selected</button>
+                            </div>
+                        </div>
+                        <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <h4 style="margin-top: 0; margin-bottom: 15px; color: #3498db;">Status Management</h4>
+                            <div class="action-group">
+                                <button class="action-btn" onclick="bulkActivateUsers()" style="background-color: #2ecc71; margin-right: 20px;">
+                                    <i style="margin-right: 5px;">✓</i> Activate Selected
+                                </button>
+                                <button class="action-btn delete" onclick="bulkRestrictUsers()">
+                                    <i style="margin-right: 5px;">✕</i> Restrict Selected
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <script>
@@ -873,6 +1023,36 @@ def generate_users_html(users: List[Dict[str, Any]]) -> str:
                     action.charAt(0).toUpperCase() + action.slice(1),
                     buttonClass
                 );
+            }
+            
+            // Function to save default token limit for new users
+            async function saveDefaultTokenLimit() {
+                const defaultLimit = parseInt(document.getElementById('default-token-limit').value);
+                
+                if (!defaultLimit || isNaN(defaultLimit) || defaultLimit < 1000) {
+                    showNotification('Please enter a valid token limit (minimum 1000)', 'warning');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/users/default-token-limit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            token_limit: defaultLimit
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        showNotification(`Default token limit for new users has been updated to ${defaultLimit}.`, 'success');
+                    } else {
+                        showNotification('Failed to update default token limit. Please try again.', 'error');
+                    }
+                } catch (error) {
+                    showNotification(`Error: ${error.message}`, 'error');
+                }
             }
             
             // Function to save token limit
