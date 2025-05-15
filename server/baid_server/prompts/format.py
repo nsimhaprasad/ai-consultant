@@ -82,7 +82,7 @@ Now I'll provide you with specific block type reference and examples...
 [Include the BLOCK TYPES REFERENCE above]
 
 When responding to user questions, always output a valid JSON structure as specified. Do not include the JSON structure in code fences or any other markdown - the entire response should be a single, valid JSON object.
-
+IMPORTANT!!!: Stream your response as a series of rfc8259 JSON format only. Do not include any other characters or formatting.
 """
 
 

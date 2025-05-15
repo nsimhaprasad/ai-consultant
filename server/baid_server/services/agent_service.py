@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import os
-import re
 from typing import Dict, Any, AsyncGenerator, Optional
 from dataclasses import dataclass
 
@@ -14,7 +13,7 @@ from google.cloud.aiplatform_v1 import types
 
 from baid_server.db.repositories.message_repository import MessageRepository
 from baid_server.db.repositories.session_repository import SessionRepository
-from baid_server.models.agent_response import parse_agent_stream
+from baid_server.core.parser.agent_response import parse_agent_stream
 from baid_server.utils.response_parser import ResponseParser
 from baid_server.prompts import RESPONSE_FORMAT
 
@@ -153,41 +152,89 @@ class AgentService:
                     "session_id": session_id,  # Add session ID to the input
                 }
             )
-
-            stream_response = self.execution_client.stream_query_reasoning_engine(stream_request)
-
-            for idx, event in enumerate(parse_agent_stream(stream_response)):
-                logger.info(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
-                full_response += str(event)
-                # Detect and surface agent errors
+            
+            # Implement retry mechanism - attempt up to 3 times
+            max_retries = 3
+            retry_count = 0
+            success = False
+            
+            while retry_count < max_retries and not success:
                 try:
-                    # Try to extract error from JSON event
-                    if isinstance(event, str):
-                        event_data = json.loads(event)
+                    logger.info(f"[{request_id}] Attempt {retry_count + 1}/{max_retries} to query and process reasoning engine response")
+                    stream_response = self.execution_client.stream_query_reasoning_engine(stream_request)
+                    
+                    # Process the stream response
+                    processed_events = 0
+                    for idx, event in enumerate(parse_agent_stream(stream_response)):
+                        logger.info(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
+                        full_response += str(event)
+                        
+                        # Detect and surface agent errors
+                        try:
+                            # Try to extract error from JSON event
+                            if isinstance(event, str):
+                                event_data = json.loads(event)
+                            else:
+                                event_data = event
+                                
+                            if isinstance(event_data, dict) and event_data.get("error_code") and event_data.get("error_message"):
+                                error_msg = f"Agent Error ({event_data['error_code']}): {event_data['error_message']}"
+                                logger.error(f"[{request_id}] Agent returned error: {error_msg}")
+                                yield f"data: {{\"error\": \"{error_msg}\"}}\n\n"
+                                # Don't mark as success but also don't retry - this is an expected error
+                                continue
+                        except Exception as parse_exc:
+                            # JSON parsing error - this is where we want to retry
+                            logger.warning(f"[{request_id}] Could not parse event for error: {parse_exc}")
+                            raise Exception(f"JSON parsing error: {str(parse_exc)}")
+                            
+                        # Process chunks as they come in
+                        async for sse_data in ResponseParser.process_incoming_chunk(event):
+                            logger.info(f"[{request_id}] Processed SSE data: {repr(sse_data)}")
+                            if sse_data:
+                                processed_events += 1
+                                yield sse_data
+                                await asyncio.sleep(1)
+                    
+                    # If we processed at least one event without exceptions, mark as success
+                    if processed_events > 0:
+                        success = True
                     else:
-                        event_data = event
-                    if isinstance(event_data, dict) and event_data.get("error_code") and event_data.get("error_message"):
-                        error_msg = f"Agent Error ({event_data['error_code']}): {event_data['error_message']}"
-                        logger.error(f"[{request_id}] Agent returned error: {error_msg}")
-                        yield f"data: {{\"error\": \"{error_msg}\"}}\n\n"
-                        continue
-                except Exception as parse_exc:
-                    logger.warning(f"[{request_id}] Could not parse event for error: {parse_exc}")
-                # Process chunks as they come in
-                async for sse_data in ResponseParser.process_incoming_chunk(event):
-                    logger.info(f"[{request_id}] Processed SSE data: {repr(sse_data)}")
-                    if sse_data:
-                        yield sse_data
-                        await asyncio.sleep(1)
+                        # No events processed, consider this a failed attempt
+                        raise Exception("No events were processed from the stream response")
+                        
+                except Exception as e:
+                    retry_count += 1
+                    logger.error(f"[{request_id}] Error in query or processing (attempt {retry_count}/{max_retries}): {str(e)}")
+                    
+                    # Clear the response for retry
+                    full_response = ""
+                    
+                    if retry_count >= max_retries:
+                        # If we've exhausted all retries, inform the client
+                        logger.error(f"[{request_id}] Max retries ({max_retries}) reached, giving up")
+                        yield f"data: {{\"error\": \"Failed after {max_retries} attempts. Last error: {str(e)}\"}}\n\n"
+                        # Send final markers even after error
+                        session_data = f"data: {{\"session_id\": \"{session_id}\"}}\n\n"
+                        yield session_data
+                        yield "data: [DONE]\n\n"
+                        return
+                    
+                    # Wait before retrying (exponential backoff)
+                    backoff_time = 2 ** retry_count  # 2, 4, 8 seconds
+                    logger.info(f"[{request_id}] Waiting {backoff_time} seconds before retry")
+                    await asyncio.sleep(backoff_time)
 
-            # Send session_id and final marker
-            session_data = f"data: {{\"session_id\": \"{session_id}\"}}\n\n"
-            logger.info(f"[{request_id}] Yielding session data: {session_data}")
-            yield session_data
+            # Only send session_id and final marker if we had a successful processing
+            if success:
+                # Send session_id and final marker
+                session_data = f"data: {{\"session_id\": \"{session_id}\"}}\n\n"
+                logger.info(f"[{request_id}] Yielding session data: {session_data}")
+                yield session_data
 
-            final_marker = "data: [DONE]\n\n"
-            logger.info(f"[{request_id}] Yielding final marker: {final_marker}")
-            yield final_marker
+                final_marker = "data: [DONE]\n\n"
+                logger.info(f"[{request_id}] Yielding final marker: {final_marker}")
+                yield final_marker
 
             # Store the complete response
             await self.message_repository.store_message(user_id, session_id, "agent", full_response.strip())

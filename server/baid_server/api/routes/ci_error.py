@@ -2,11 +2,11 @@ import logging
 import os
 from typing import Dict, Any
 
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from baid_server.api.dependencies import get_current_user
 from baid_server.models.ci_error import CIErrorRequest
-from baid_server.models.agent_response import parse_ci_response
+from baid_server.core.parser.agent_response import parse_ci_response
 from baid_server.prompts.format import CI_RESPONSE_FORMAT
 from baid_server.utils.ci_response_parser import CiResponseParser
 
