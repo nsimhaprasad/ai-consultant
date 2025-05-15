@@ -613,7 +613,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 contentType = "text/html"
                 // Use MessageFormatter to process the message and extract code blocks
                 val messageWidth = getMessageWidth()
-                val (htmlContent, codeBlocks) = MessageFormatter.processMessage(content, messageWidth)
+                val (htmlContent, _) = MessageFormatter.processMessage(content, messageWidth)
                 text = htmlContent
                 font = FontUtil.getBodyFont()
                 isEditable = false
@@ -791,7 +791,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             contentType = "text/html"
             // Use MessageFormatter to process the message and extract code blocks
             val messageWidth = getMessageWidth()
-            val (htmlContent, codeBlocks) = MessageFormatter.processMessage(content, messageWidth)
+            val (htmlContent, _) = MessageFormatter.processMessage(content, messageWidth)
             text = htmlContent
             font = FontUtil.getBodyFont()
             isEditable = false
@@ -1233,8 +1233,6 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                     showLoginPanel()
                                     return@invokeLater
                                 }
-                                // Continue with API request, pass sessionId
-                                // Debug log to track currentSessionId value
                                 println("Debug: Sending request with sessionId: $currentSessionId")
                                 performAPIRequest(userPrompt, accessToken, currentSessionId)
                             }
