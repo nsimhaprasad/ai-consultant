@@ -86,7 +86,6 @@ Stream your response as a series of rfc8259 JSON format only. Do not include any
         async def ci_stream():
             full_response = ""
             logger.info(f"[{request_id}] Streaming agent response...")
-            loop = asyncio.get_event_loop()
             for idx, event in enumerate(parse_ci_response(stream_response)):
                 logger.info(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
                 full_response += str(event)

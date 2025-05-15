@@ -14,7 +14,13 @@ def parse_agent_response(response_chunk):
         if not match:
             raise ValueError("Could not extract JSON from chunk")
 
-        inner_json_str = match.group(2).encode('utf-8').decode('unicode_escape')
+        # inner_json_str = match.group(2).encode('utf-8').decode('unicode_escape')
+
+        inner_json_str = match.group(2)
+        # Handle escape sequences manually
+        inner_json_str = inner_json_str.replace('\\\\', '\\').replace('\\n', '\n')
+        # Fix any invalid escape sequences
+        inner_json_str = re.sub(r'\\([^"\\/bfnrtu])', r'\1', inner_json_str)
 
         try:
             inner_data = json.loads(inner_json_str)
