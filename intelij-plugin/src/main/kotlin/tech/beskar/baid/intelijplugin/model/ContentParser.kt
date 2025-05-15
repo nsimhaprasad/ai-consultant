@@ -17,6 +17,35 @@ object ContentParser {
         )
     }
 
+    fun parseJetbrainsResponse(json: String): ContentResponse {
+        val root = JSONObject(json)
+
+        // Check if this is the new format
+        if (root.has("schema") && root.getString("schema") == "jetbrains-llm-response") {
+            val responseObj = root.getJSONObject("response")
+
+            // Ensure it's a content type response
+            if (responseObj.has("type") && responseObj.getString("type") == "content") {
+                val contentObj = responseObj.getJSONObject("content")
+
+                if (contentObj.has("blocks")) {
+                    val blocksJson = contentObj.getJSONArray("blocks")
+                    val blocks = mutableListOf<Block>()
+
+                    for (i in 0 until blocksJson.length()) {
+                        val blockObj = blocksJson.getJSONObject(i)
+                        blocks.add(parseBlock(blockObj))
+                    }
+
+                    return ContentResponse(blocks = blocks)
+                }
+            }
+        }
+
+        // Fallback to original parser if not in the expected format
+        return parseResponse(json)
+    }
+
     fun parseBlock(blockObj: JSONObject): Block = when (blockObj.getString("type")) {
         "paragraph" -> {
             val content = blockObj.getString("content")

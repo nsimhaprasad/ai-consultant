@@ -19,6 +19,7 @@ import tech.beskar.baid.intelijplugin.auth.LoginPanel
 import tech.beskar.baid.intelijplugin.config.BaidConfiguration
 import tech.beskar.baid.intelijplugin.model.Block
 import tech.beskar.baid.intelijplugin.model.ContentParser
+import tech.beskar.baid.intelijplugin.model.ContentResponse
 import tech.beskar.baid.intelijplugin.ui.ContentRenderer
 import tech.beskar.baid.intelijplugin.ui.MessageFormatter
 import tech.beskar.baid.intelijplugin.util.FontUtil
@@ -592,6 +593,254 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         }
     }
 
+    private fun createMessagePanel(content: String, isUser: Boolean): JBPanel<JBPanel<*>> {
+        // Create message panel with WhatsApp-like layout
+        val messagePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+            background = JBColor.background()
+            border = JBUI.Borders.empty(JBUI.scale(4), JBUI.scale(16))
+        }
+
+        if (isUser) {
+            // For user messages, use the simple text formatting
+            // Create message bubble container
+            val bubbleContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                background = JBColor(Color(220, 248, 198), Color(54, 93, 69)) // Light green for user
+                border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
+            }
+
+            // Create message text area
+            val messageText = JTextPane().apply {
+                contentType = "text/html"
+                // Use MessageFormatter to process the message and extract code blocks
+                val messageWidth = getMessageWidth()
+                val (htmlContent, codeBlocks) = MessageFormatter.processMessage(content, messageWidth)
+                text = htmlContent
+                font = FontUtil.getBodyFont()
+                isEditable = false
+                isOpaque = false
+                background = Color(0, 0, 0, 0) // Transparent
+                foreground = Color.BLACK
+                border = JBUI.Borders.empty()
+                maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
+            }
+
+            // Add message text to bubble
+            bubbleContainer.add(messageText, BorderLayout.CENTER)
+
+            // Create message with avatar container (user message: right-aligned with avatar on right)
+            val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                isOpaque = false
+                layout = FlowLayout(FlowLayout.RIGHT, 0, 0)
+                
+                // First add the bubble
+                add(bubbleContainer)
+                
+                var avatarLabel = JLabel().apply {
+                    icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
+                    border = JBUI.Borders.emptyRight(JBUI.scale(8))
+                    verticalAlignment = JLabel.TOP
+                }
+                
+                val userInfo = authService.getUserInfo()
+
+                // Then add the avatar with profile picture if available
+                if (userInfo?.picture != null) {
+                    avatarLabel = CircularAvatarLabel("").apply {
+                        // Default icon in case profile picture can't be loaded
+                        preferredSize = Dimension(24, 24)
+                        border = JBUI.Borders.emptyLeft(JBUI.scale(8))
+                        verticalAlignment = JLabel.TOP
+
+                        // Try to get user info and profile picture
+                        // Load profile image asynchronously to prevent UI freezes
+                        ApplicationManager.getApplication().executeOnPooledThread {
+                            val profileIcon = loadProfileImage(userInfo.picture, 24)
+                            if (profileIcon != null) {
+                                // Update UI on EDT
+                                ApplicationManager.getApplication().invokeLater {
+                                    icon = profileIcon
+                                }
+                            }
+                        }
+                    }
+                }
+                add(avatarLabel)
+            }
+
+            messagePanel.add(contentPanel, BorderLayout.CENTER)
+        } else {
+            // For agent messages, try to parse JSON blocks if possible
+            try {
+                // Check if the message is in JSON format with blocks
+                if (content.trim().startsWith("{")) {
+                    // Create agent message with WhatsApp-like layout
+                    val bubbleContainer = JBPanel<JBPanel<*>>(VerticalLayout(8)).apply {
+                        background = JBColor(Color(255, 255, 255), Color(60, 63, 65))
+                        border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
+                    }
+
+                    // Create message with avatar container for agent response
+                    val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                        isOpaque = false
+                    }
+
+                    val avatarLabel = JLabel().apply {
+                        icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
+                        border = JBUI.Borders.emptyRight(JBUI.scale(8))
+                        verticalAlignment = JLabel.TOP
+                    }
+
+                    contentPanel.add(avatarLabel, BorderLayout.WEST)
+                    contentPanel.add(bubbleContainer, BorderLayout.CENTER)
+
+                    // Add padding on the right
+                    val spacer = JPanel().apply {
+                        isOpaque = false
+                        preferredSize = Dimension(JBUI.scale(100), 0)
+                    }
+                    contentPanel.add(spacer, BorderLayout.EAST)
+                    messagePanel.add(contentPanel, BorderLayout.CENTER)
+
+                    // Parse and render the blocks
+                    try {
+                        val jsonObj = JSONObject(content)
+                        var response: ContentResponse? = null
+
+                        // Check for JetBrains LLM response format
+                        if (jsonObj.has("schema") && jsonObj.getString("schema") == "jetbrains-llm-response") {
+                            println("Found JetBrains LLM response format")
+                            // Parse using the JetBrains response format parser
+                            response = ContentParser.parseJetbrainsResponse(content)
+                        } else if (jsonObj.has("blocks")) {
+                            // Standard blocks format
+                            response = ContentParser.parseResponse(content)
+                        } else {
+                            // Try to parse as a single block
+                            val block = ContentParser.parseBlock(jsonObj)
+                            val comp = when (block) {
+                                is Block.Paragraph -> ContentRenderer.renderParagraph(block)
+                                is Block.Code -> ContentRenderer.renderCode(block)
+                                is Block.Command -> ContentRenderer.renderCommand(block)
+                                is Block.ListBlock -> ContentRenderer.renderList(block)
+                                is Block.Heading -> ContentRenderer.renderHeading(block)
+                                else -> null
+                            }
+                            comp?.let {
+                                bubbleContainer.add(it)
+                            }
+                        }
+
+                        // Render all blocks if we have a response with blocks
+                        response?.blocks?.forEach { block ->
+                            println("Rendering block: $block")
+                            val comp = when (block) {
+                                is Block.Paragraph -> ContentRenderer.renderParagraph(block)
+                                is Block.Code -> ContentRenderer.renderCode(block)
+                                is Block.Command -> ContentRenderer.renderCommand(block)
+                                is Block.ListBlock -> ContentRenderer.renderList(block)
+                                is Block.Heading -> ContentRenderer.renderHeading(block)
+                                is Block.Callout -> ContentRenderer.renderCallout(block)
+                            }
+                            comp.let {
+                                bubbleContainer.add(it)
+                            }
+                        }
+
+                        return messagePanel
+                    } catch (e: Exception) {
+                        println("Error parsing JSON blocks: ${e.message}")
+                        // If JSON parsing fails, fall back to simple message
+                        return createSimpleMessagePanel(content, isUser)
+                    }
+                } else {
+                    // Not JSON format, create simple message panel
+                    return createSimpleMessagePanel(content, isUser)
+                }
+            } catch (e: Exception) {
+                println("Error creating message panel: ${e.message}")
+                // In case of any error, fallback to simple message panel
+                return createSimpleMessagePanel(content, isUser)
+            }
+        }
+
+        return messagePanel
+    }
+
+    /**
+     * Creates a simple message panel for non-JSON content
+     */
+    private fun createSimpleMessagePanel(content: String, isUser: Boolean): JBPanel<JBPanel<*>> {
+        // Create message panel with WhatsApp-like layout
+        val messagePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+            background = JBColor.background()
+            border = JBUI.Borders.empty(JBUI.scale(4), JBUI.scale(16))
+        }
+
+        // Create message bubble container
+        val bubbleContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+            background = if (isUser) {
+                JBColor(Color(220, 248, 198), Color(54, 93, 69)) // Light green for user
+            } else {
+                JBColor(Color(255, 255, 255), Color(60, 63, 65)) // White/dark for agent
+            }
+            border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
+        }
+
+        // Create message text area
+        val messageText = JTextPane().apply {
+            contentType = "text/html"
+            // Use MessageFormatter to process the message and extract code blocks
+            val messageWidth = getMessageWidth()
+            val (htmlContent, codeBlocks) = MessageFormatter.processMessage(content, messageWidth)
+            text = htmlContent
+            font = FontUtil.getBodyFont()
+            isEditable = false
+            isOpaque = false
+            background = Color(0, 0, 0, 0) // Transparent
+            foreground = if (isUser) Color.BLACK else JBColor.foreground()
+            border = JBUI.Borders.empty()
+            maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
+        }
+
+        // Add message text to bubble
+        bubbleContainer.add(messageText, BorderLayout.CENTER)
+
+        // Create message with avatar container
+        val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+            isOpaque = false
+
+            if (isUser) {
+                // User message: right-aligned with avatar on right
+                layout = FlowLayout(FlowLayout.RIGHT, 0, 0)
+                add(bubbleContainer)
+                add(CircularAvatarLabel("").apply {
+                    preferredSize = Dimension(24, 24)
+                    border = JBUI.Borders.emptyLeft(JBUI.scale(8))
+                    verticalAlignment = JLabel.TOP
+                })
+            } else {
+                // Agent message: avatar on left, bubble on right
+                val avatarLabel = JLabel().apply {
+                    icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
+                    border = JBUI.Borders.emptyRight(JBUI.scale(8))
+                    verticalAlignment = JLabel.TOP
+                }
+                add(avatarLabel, BorderLayout.WEST)
+                add(bubbleContainer, BorderLayout.CENTER)
+
+                // Add padding on the right to keep message left-aligned
+                val spacer = JPanel().apply {
+                    isOpaque = false
+                    preferredSize = Dimension(JBUI.scale(100), 0) // Adjust width as needed
+                }
+                add(spacer, BorderLayout.EAST)
+            }
+        }
+
+        messagePanel.add(contentPanel, BorderLayout.CENTER)
+        return messagePanel
+    }
+    
     private fun loadConversation(userId: String, sessionId: String) {
         // Set current session ID
         currentSessionId = sessionId
@@ -632,24 +881,48 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 val historyJson = JSONObject(historyResult)
                 val messagesArray = historyJson.getJSONArray("history")
 
-                // Remove loading message
+                // Create a list to hold all message panels in order
+                val messagePanels = mutableListOf<JBPanel<JBPanel<*>>>()
+                
+                // Process all messages first and create panels
+                for (i in 0 until messagesArray.length()) {
+                    val message = messagesArray.getJSONObject(i)
+                    val role = message.getString("role")
+                    val content = message.getString("message")
+                    val isUser = role == "user"
+                    println("Processing message: role=$role, isUser=$isUser")
+                    
+                    // Create panel for this message
+                    val panel = createMessagePanel(content, isUser)
+                    messagePanels.add(panel)
+                }
+                
+                // Remove loading message and add all panels in the correct order
                 SwingUtilities.invokeLater {
+                    // Remove loading indicator
                     removeLastMessageIfThinking()
-
-                    // Display conversation history
-                    for (i in 0 until messagesArray.length()) {
-                        val message = messagesArray.getJSONObject(i)
-                        val role = message.getString("role")
-                        val content = message.getString("message")
-
-                        appendMessage(content, isUser = role == "user")
+                    
+                    // Add all message panels in order
+                    for (panel in messagePanels) {
+                        chatPanel.add(panel)
                     }
-
-                    // Add a separator to indicate where the new messages will start
-                    appendMessage(
+                    
+                    // Add a separator to indicate where new messages will start
+                    val separatorPanel = createSimpleMessagePanel(
                         "Continuing this conversation. Any new messages will be part of this session.",
                         isUser = false
                     )
+                    chatPanel.add(separatorPanel)
+                    
+                    // Revalidate and repaint the chat panel
+                    chatPanel.revalidate()
+                    chatPanel.repaint()
+                    
+                    // Scroll to bottom
+                    SwingUtilities.invokeLater {
+                        val vertical = chatScroll.verticalScrollBar
+                        vertical.value = vertical.maximum
+                    }
                 }
             } catch (e: Exception) {
                 SwingUtilities.invokeLater {
@@ -921,103 +1194,8 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     }
 
     fun appendMessage(message: String, isUser: Boolean) {
-        // Create message panel with WhatsApp-like layout
-        val messagePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
-            background = JBColor.background()
-            border = JBUI.Borders.empty(JBUI.scale(4), JBUI.scale(16))
-        }
-
-        // Create message bubble container
-        val bubbleContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
-            background = if (isUser) {
-                JBColor(Color(220, 248, 198), Color(54, 93, 69)) // Light green for user
-            } else {
-                JBColor(Color(255, 255, 255), Color(60, 63, 65)) // White/dark for agent
-            }
-            border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
-        }
-
-        // Create message text area
-        val messageText = JTextPane().apply {
-            contentType = "text/html"
-            // Use MessageFormatter to process the message and extract code blocks
-            val messageWidth = getMessageWidth()
-            val (htmlContent, codeBlocks) = MessageFormatter.processMessage(message, messageWidth)
-            text = htmlContent
-            font = FontUtil.getBodyFont()
-            isEditable = false
-            isOpaque = false
-            background = Color(0, 0, 0, 0) // Transparent
-            foreground = if (isUser) Color.BLACK else JBColor.foreground()
-            border = JBUI.Borders.empty()
-
-            // Simple maximum width constraint
-            maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
-        }
-
-        // Add message text to bubble
-        bubbleContainer.add(messageText, BorderLayout.CENTER)
-
-        // Create message with avatar container
-        val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
-            isOpaque = false
-
-            if (isUser) {
-                // User message: right-aligned with avatar on right
-                // Use FlowLayout.RIGHT to align the bubble to the right side
-                layout = FlowLayout(FlowLayout.RIGHT, 0, 0)
-
-                // First add the bubble
-                add(bubbleContainer)
-                var avatarLabel = JLabel().apply {
-                    icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
-                    border = JBUI.Borders.emptyRight(JBUI.scale(8))
-                    verticalAlignment = JLabel.TOP
-                }
-                val userInfo = authService.getUserInfo()
-
-                // Then add the avatar with profile picture if available
-                if (userInfo?.picture != null) {
-                    avatarLabel = CircularAvatarLabel("").apply {
-                        // Default icon in case profile picture can't be loaded
-                        preferredSize = Dimension(24, 24)
-                        border = JBUI.Borders.emptyLeft(JBUI.scale(8))
-                        verticalAlignment = JLabel.TOP
-
-                        // Try to get user info and profile picture
-                        // Load profile image asynchronously to prevent UI freezes
-                        ApplicationManager.getApplication().executeOnPooledThread {
-                            val profileIcon = loadProfileImage(userInfo.picture, 24)
-                            if (profileIcon != null) {
-                                // Update UI on EDT
-                                ApplicationManager.getApplication().invokeLater {
-                                    icon = profileIcon
-                                }
-                            }
-                        }
-                    }
-                }
-                add(avatarLabel)
-            } else {
-                // Agent message: avatar on left, bubble on right
-                val avatarLabel = JLabel().apply {
-                    icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
-                    border = JBUI.Borders.emptyRight(JBUI.scale(8))
-                    verticalAlignment = JLabel.TOP
-                }
-                add(avatarLabel, BorderLayout.WEST)
-                add(bubbleContainer, BorderLayout.CENTER)
-
-                // Add padding on the right to keep message left-aligned
-                val spacer = JPanel().apply {
-                    isOpaque = false
-                    preferredSize = Dimension(JBUI.scale(100), 0) // Adjust width as needed
-                }
-                add(spacer, BorderLayout.EAST)
-            }
-        }
-
-        messagePanel.add(contentPanel, BorderLayout.CENTER)
+        // Create message panel using our helper method
+        val messagePanel = createMessagePanel(message, isUser)
 
         // Add message panel to chat panel
         SwingUtilities.invokeLater {
