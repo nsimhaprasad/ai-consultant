@@ -80,6 +80,9 @@ Stream your response as a series of rfc8259 JSON format only. Do not include any
         api_endpoint = f"{os.getenv('LOCATION', 'us-central1')}-aiplatform.googleapis.com"
         execution_client = ReasoningEngineExecutionServiceClient(client_options={"api_endpoint": api_endpoint})
         stream_response = execution_client.stream_query_reasoning_engine(stream_request)
+
+        stream_response = await log_complete_response_from_agent(request_id, stream_response)
+
         import functools
         import asyncio
         import json
@@ -119,3 +122,24 @@ Stream your response as a series of rfc8259 JSON format only. Do not include any
             yield f"data: {{\"solution\": \"Internal server error\", \"explanation\": \"{error_msg}\"}}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(error_stream(), media_type="text/event-stream")
+
+
+async def log_complete_response_from_agent(request_id, stream_response):
+    """Log the complete response from the agent while preserving the streaming nature."""
+    logger.info(f"[{request_id}] === Logging complete raw response ===")
+
+    # Create a new async generator that logs and forwards chunks
+    async def logged_response():
+        chunk_count = 0
+        try:
+            for raw_chunk in stream_response:
+                # Log each chunk
+                logger.info(f"[{request_id}] RAW CHUNK #{chunk_count}: {repr(raw_chunk)}")
+                chunk_count += 1
+                # Forward the chunk downstream
+                yield raw_chunk
+        except Exception as e:
+            logger.error(f"[{request_id}] Error in logged_response: {str(e)}")
+
+    # Return the new generator
+    return logged_response()
