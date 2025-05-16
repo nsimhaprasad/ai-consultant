@@ -7,7 +7,65 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize select all checkbox functionality
     initializeSelectAllCheckbox();
+    
+    // Initialize formatted number inputs
+    initializeFormattedNumberInputs();
 });
+
+/**
+ * Initialize formatted number inputs with comma separators
+ */
+function initializeFormattedNumberInputs() {
+    // Format the default token limit input
+    const defaultTokenInput = document.getElementById('default-token-limit');
+    if (defaultTokenInput) {
+        // Create a formatted display next to the input
+        const formattedDisplay = document.createElement('span');
+        formattedDisplay.className = 'formatted-number';
+        formattedDisplay.textContent = Number(defaultTokenInput.value).toLocaleString();
+        defaultTokenInput.parentNode.insertBefore(formattedDisplay, defaultTokenInput.nextSibling);
+        defaultTokenInput.style.display = 'none';
+        
+        // Update the hidden input when clicking on the formatted display
+        formattedDisplay.addEventListener('click', function() {
+            formattedDisplay.style.display = 'none';
+            defaultTokenInput.style.display = 'inline-block';
+            defaultTokenInput.focus();
+        });
+        
+        // Update the formatted display when the input loses focus
+        defaultTokenInput.addEventListener('blur', function() {
+            formattedDisplay.textContent = Number(defaultTokenInput.value).toLocaleString();
+            defaultTokenInput.style.display = 'none';
+            formattedDisplay.style.display = 'inline-block';
+        });
+    }
+    
+    // Format all user token limit inputs
+    const tokenInputs = document.querySelectorAll('input.token-input[data-user-id]');
+    tokenInputs.forEach(input => {
+        // Create a formatted display for each input
+        const formattedDisplay = document.createElement('span');
+        formattedDisplay.className = 'formatted-number';
+        formattedDisplay.textContent = Number(input.value).toLocaleString();
+        input.parentNode.insertBefore(formattedDisplay, input.nextSibling);
+        input.style.display = 'none';
+        
+        // Update the hidden input when clicking on the formatted display
+        formattedDisplay.addEventListener('click', function() {
+            formattedDisplay.style.display = 'none';
+            input.style.display = 'inline-block';
+            input.focus();
+        });
+        
+        // Update the formatted display when the input loses focus
+        input.addEventListener('blur', function() {
+            formattedDisplay.textContent = Number(input.value).toLocaleString();
+            input.style.display = 'none';
+            formattedDisplay.style.display = 'inline-block';
+        });
+    });
+}
 
 /**
  * Initialize the select all checkbox functionality
@@ -299,7 +357,9 @@ async function saveDefaultTokenLimit() {
         });
         
         if (response.ok) {
-            showNotification(`Default token limit for new users has been updated to ${defaultLimit}.`, 'success');
+            showNotification(`Default token limit for new users has been updated to ${defaultLimit.toLocaleString()}.`, 'success');
+            // Reload the page to reflect changes
+            setTimeout(() => window.location.reload(), 1500);
         } else {
             showNotification('Failed to update default token limit. Please try again.', 'error');
         }

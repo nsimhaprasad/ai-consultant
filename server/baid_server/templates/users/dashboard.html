@@ -46,30 +46,92 @@
             flex-wrap: wrap;
         }
         
-        .global-limit-banner {
-            background-color: #e9f5ff;
-            border: 1px solid #cce5ff;
-            border-radius: 8px;
-            padding: 16px 20px;
+        .settings-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            padding: 24px;
             margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .settings-header {
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
         }
         
-        .global-limit-info {
-            font-size: 16px;
-            font-weight: 500;
-            color: var(--info-color);
+        .settings-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-color);
         }
         
-        .global-limit-value {
+        .settings-content {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 20px;
+            justify-content: space-between;
+        }
+        
+        .settings-info {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .settings-label {
+            font-size: 14px;
+            color: var(--muted-text);
+            margin-bottom: 5px;
+        }
+        
+        .settings-value {
+            font-size: 20px;
             font-weight: 600;
             color: var(--info-color);
-            background-color: rgba(17, 138, 178, 0.1);
-            padding: 2px 8px;
-            border-radius: 4px;
-            margin-left: 4px;
+        }
+        
+        .settings-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .settings-input {
+            width: 150px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+        
+        .settings-input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+        }
+        
+        .formatted-number {
+            display: inline-block;
+            width: 150px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 15px;
+            background-color: var(--bg-color);
+            cursor: text;
+            transition: border-color 0.2s;
+            text-align: right;
+        }
+        
+        .formatted-number:hover {
+            border-color: var(--primary-color);
         }
         
         .dashboard-title {
@@ -568,17 +630,24 @@
     <div class="container">
         <div class="dashboard-header">
             <h1 class="dashboard-title">User Management</h1>
-            <div class="dashboard-actions">
-                <div class="bulk-input-group">
-                    <input type="number" id="default-token-limit" class="token-input" value="{{ default_token_limit }}" min="1000" placeholder="Token limit">
-                    <button class="btn btn-primary" onclick="saveDefaultTokenLimit()">Set Default Limit</button>
-                </div>
-            </div>
         </div>
         
-        <div class="global-limit-banner">
-            <div class="global-limit-info">
-                Current default token limit for new users: <span class="global-limit-value">{{ default_token_limit }}</span>
+        <div class="settings-card">
+            <div class="settings-header">
+                <h2 class="settings-title">Global Settings</h2>
+            </div>
+            <div class="settings-content">
+                <div class="settings-info">
+                    <div class="settings-label">Default Token Limit for New Users</div>
+                    <div class="settings-value">{{ '{:,}'.format(default_token_limit) }}</div>
+                    <p style="margin-top: 8px; color: var(--muted-text); font-size: 13px;">
+                        This limit will be applied to all newly registered users automatically.
+                    </p>
+                </div>
+                <div class="settings-form">
+                    <input type="number" id="default-token-limit" class="settings-input" value="{{ default_token_limit }}" min="1000" placeholder="New limit">
+                    <button class="btn btn-success" onclick="saveDefaultTokenLimit()">Update Limit</button>
+                </div>
             </div>
         </div>
         
@@ -644,7 +713,7 @@
                         <td>
                             <div class="token-usage">
                                 <div class="token-stats">
-                                    <span>{{ user.token_count }} / {{ user.token_limit }} tokens</span>
+                                    <span>{{ '{:,}'.format(user.token_count) }} / {{ '{:,}'.format(user.token_limit) }} tokens</span>
                                     <span>{{ user.token_percentage }}%</span>
                                 </div>
                                 <div class="progress-container">
