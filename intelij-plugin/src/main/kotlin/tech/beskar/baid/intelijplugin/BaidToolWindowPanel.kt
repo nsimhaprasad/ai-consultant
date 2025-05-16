@@ -13,6 +13,7 @@ import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import org.json.JSONArray
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
@@ -620,7 +621,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 isEditable = false
                 isOpaque = false
                 background = Color(0, 0, 0, 0) // Transparent
-                foreground = Color.BLACK
+                foreground = JBColor.BLACK
                 border = JBUI.Borders.empty()
                 maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
             }
@@ -751,26 +752,23 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                     } catch (e: Exception) {
                         println("Error parsing JSON blocks: ${e.message}")
                         // If JSON parsing fails, fall back to simple message
-                        return createSimpleMessagePanel(content, isUser)
+                        return createSimpleMessagePanel(content)
                     }
                 } else {
                     // Not JSON format, create simple message panel
-                    return createSimpleMessagePanel(content, isUser)
+                    return createSimpleMessagePanel(content)
                 }
             } catch (e: Exception) {
                 println("Error creating message panel: ${e.message}")
                 // In case of any error, fallback to simple message panel
-                return createSimpleMessagePanel(content, isUser)
+                return createSimpleMessagePanel(content)
             }
         }
 
         return messagePanel
     }
 
-    /**
-     * Creates a simple message panel for non-JSON content
-     */
-    private fun createSimpleMessagePanel(content: String, isUser: Boolean): JBPanel<JBPanel<*>> {
+    private fun createSimpleMessagePanel(content: String): JBPanel<JBPanel<*>> {
         // Create message panel with WhatsApp-like layout
         val messagePanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
             background = JBColor.background()
@@ -779,11 +777,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
         // Create message bubble container
         val bubbleContainer = JBPanel<JBPanel<*>>(BorderLayout()).apply {
-            background = if (isUser) {
-                JBColor(Color(220, 248, 198), Color(54, 93, 69)) // Light green for user
-            } else {
-                JBColor(Color(255, 255, 255), Color(60, 63, 65)) // White/dark for agent
-            }
+            background = JBColor(Gray._255, Color(60, 63, 65)) // White/dark for agent
             border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
         }
 
@@ -798,7 +792,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             isEditable = false
             isOpaque = false
             background = Color(0, 0, 0, 0) // Transparent
-            foreground = if (isUser) Color.BLACK else JBColor.foreground()
+            foreground = JBColor.foreground()
             border = JBUI.Borders.empty()
             maximumSize = Dimension(JBUI.scale(400), Int.MAX_VALUE)
         }
@@ -810,16 +804,6 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
             isOpaque = false
 
-            if (isUser) {
-                // User message: right-aligned with avatar on right
-                layout = FlowLayout(FlowLayout.RIGHT, 0, 0)
-                add(bubbleContainer)
-                add(CircularAvatarLabel("").apply {
-                    preferredSize = Dimension(24, 24)
-                    border = JBUI.Borders.emptyLeft(JBUI.scale(8))
-                    verticalAlignment = JLabel.TOP
-                })
-            } else {
                 // Agent message: avatar on left, bubble on right
                 val avatarLabel = JLabel().apply {
                     icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
@@ -835,7 +819,6 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                     preferredSize = Dimension(JBUI.scale(100), 0) // Adjust width as needed
                 }
                 add(spacer, BorderLayout.EAST)
-            }
         }
 
         messagePanel.add(contentPanel, BorderLayout.CENTER)
@@ -941,7 +924,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             val originalImage = ImageIO.read(url) ?: return null
 
             // Create a clean circular image with transparency
-            val outputImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+            val outputImage = UIUtil.createImage(size, size, BufferedImage.TYPE_INT_ARGB)
             val g2d = outputImage.createGraphics()
 
             try {
@@ -985,7 +968,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                             // Create a CircularAvatarLabel instance for the profile avatar
                             var avatarLabel = JLabel(userInfo.name.firstOrNull()?.toString() ?: "U").apply {
                                 font = Font(Font.SANS_SERIF, Font.BOLD, 14)
-                                foreground = Color.WHITE
+                                foreground = JBColor.WHITE
                                 background = JBColor(Color(70, 130, 180), Color(100, 149, 237))
                                 isOpaque = true
                                 horizontalAlignment = SwingConstants.CENTER
@@ -1006,7 +989,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                 avatarLabel =
                                     CircularAvatarLabel(userInfo.name.firstOrNull()?.toString() ?: "U").apply {
                                         font = Font(Font.SANS_SERIF, Font.BOLD, 14)
-                                        foreground = Color.WHITE
+                                        foreground = JBColor.WHITE
                                         background = JBColor(Color(56, 114, 159), Color(56, 114, 159))
                                         isOpaque = true
                                         horizontalAlignment = SwingConstants.CENTER
@@ -1156,6 +1139,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                     }
                 }
             } catch (e: Exception) {
+                println("Error checking authentication status: ${e.message}")
                 SwingUtilities.invokeLater {
                     // Show login panel on error
                     showLoginPanel()
@@ -1251,6 +1235,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                 performAPIRequest(userPrompt, accessToken, currentSessionId)
                             }
                         } catch (e: Exception) {
+                            println("Error getting access token: ${e.message}")
                             SwingUtilities.invokeLater {
                                 appendMessage("Authentication check failed. Please sign in again.", isUser = false)
                                 showLoginPanel()
@@ -1259,6 +1244,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                     }
                 }
             } catch (e: Exception) {
+                println("Error checking authentication status: ${e.message}")
                 SwingUtilities.invokeLater {
                     appendMessage("Authentication check failed. Please sign in again.", isUser = false)
                     showLoginPanel()
@@ -1325,7 +1311,6 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                         }
 
                         // Create a streaming response handler
-                        var fullResponse = ""
                         var updatedSessionId: String? = sessionId
                         var lineCount = 0
 
@@ -1439,9 +1424,8 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                                     is Block.ListBlock -> ContentRenderer.renderList(block)
                                                     is Block.Heading -> ContentRenderer.renderHeading(block)
                                                     is Block.Callout -> ContentRenderer.renderCallout(block)
-                                                    else -> null
                                                 }
-                                                comp?.let {
+                                                comp.let {
                                                     SwingUtilities.invokeLater {
                                                         bubbleContainer.add(it)
                                                         messagePanel.revalidate()
@@ -1510,6 +1494,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                         chatPanel.repaint()
                     }
                 } catch (e: Exception) {
+                    println("Error removing last message: ${e.message}")
                     // If structure doesn't match, ignore
                 }
             }
