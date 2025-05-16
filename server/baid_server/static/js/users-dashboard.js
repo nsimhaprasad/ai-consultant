@@ -313,12 +313,20 @@ async function saveDefaultTokenLimit() {
  * @param {string} userId - The user ID to update
  */
 async function saveTokenLimit(userId) {
-    const input = document.querySelector(`input[data-user-id="${userId}"]`);
+    // Use a more specific selector to target only the token input, not the checkbox
+    const input = document.querySelector(`input.token-input[data-user-id="${userId}"]`);
     const newLimit = input.value.trim();
     const newLimitInt = parseInt(newLimit, 10);
     
-    if (newLimit === '' || isNaN(newLimitInt) || newLimitInt < 1000) {
-        showNotification('Please enter a valid token limit (minimum 1000)', 'warning');
+    // Check if the input is valid
+    if (newLimit === '' || isNaN(newLimitInt)) {
+        showNotification('Please enter a valid token limit', 'warning');
+        return;
+    }
+    
+    // Check if the input meets the minimum requirement
+    if (newLimitInt < 1000) {
+        showNotification('Token limit must be at least 1000', 'warning');
         return;
     }
     

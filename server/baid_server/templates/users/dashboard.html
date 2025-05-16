@@ -125,6 +125,65 @@
             white-space: nowrap;
         }
         
+        /* Toggle Switch Styles */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--danger-color);
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--success-color);
+        }
+        
+        input:focus + .slider {
+            box-shadow: 0 0 1px var(--success-color);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(30px);
+        }
+        
+        .status-label {
+            display: inline-block;
+            font-weight: 500;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+        
         th {
             background-color: rgba(0, 0, 0, 0.02);
             font-weight: 600;
@@ -547,7 +606,7 @@
                         <th width="25%">User</th>
                         <th>Status</th>
                         <th>Messages</th>
-                        <th width="20%">Tokens Usage</th>
+                        <th width="20%">Token Usage</th>
                         <th>Token Limit</th>
                         <th>Actions</th>
                     </tr>
@@ -585,7 +644,7 @@
                         <td>
                             <div class="token-usage">
                                 <div class="token-stats">
-                                    <span>{{ user.token_count }} tokens</span>
+                                    <span>{{ user.token_count }} / {{ user.token_limit }} tokens</span>
                                     <span>{{ user.token_percentage }}%</span>
                                 </div>
                                 <div class="progress-container">
@@ -600,7 +659,7 @@
                             </div>
                         </td>
                         <td style="text-align: left;">
-                            {% if user.status == 'Active' %}
+                            {% if user.status|lower == 'active' %}
                             <button class="btn btn-danger" onclick="toggleUserStatus('{{ user.email }}', '{{ user.status }}')">Restrict</button>
                             {% else %}
                             <button class="btn btn-success" onclick="toggleUserStatus('{{ user.email }}', '{{ user.status }}')">Activate</button>
