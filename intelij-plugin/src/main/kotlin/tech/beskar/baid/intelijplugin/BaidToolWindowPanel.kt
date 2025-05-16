@@ -4,6 +4,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.IconLoader
+import com.intellij.ui.Gray
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
@@ -636,7 +637,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 add(bubbleContainer)
                 
                 var avatarLabel = JLabel().apply {
-                    icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
+                    icon = AllIcons.General.User
                     border = JBUI.Borders.emptyRight(JBUI.scale(8))
                     verticalAlignment = JLabel.TOP
                 }
@@ -675,7 +676,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 if (content.trim().startsWith("{")) {
                     // Create agent message with WhatsApp-like layout
                     val bubbleContainer = JBPanel<JBPanel<*>>(VerticalLayout(8)).apply {
-                        background = JBColor(Color(255, 255, 255), Color(60, 63, 65))
+                        background = JBColor(Gray._255, Color(60, 63, 65))
                         border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
                     }
 
@@ -854,8 +855,13 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         // Clear current chat
         clearChat()
 
-        // Show loading message
-        appendMessage("Loading conversation history...", isUser = false)
+        // Show loading message and store its reference
+        val loadingMessage = createMessagePanel("Loading conversation history...", false)
+        SwingUtilities.invokeLater {
+            chatPanel.add(loadingMessage)
+            chatPanel.revalidate()
+            chatPanel.repaint()
+        }
 
         // Load conversation history
         ApplicationManager.getApplication().executeOnPooledThread {
@@ -890,7 +896,6 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                     val role = message.getString("role")
                     val content = message.getString("message")
                     val isUser = role == "user"
-                    println("Processing message: role=$role, isUser=$isUser")
                     
                     // Create panel for this message
                     val panel = createMessagePanel(content, isUser)
@@ -899,30 +904,26 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                 
                 // Remove loading message and add all panels in the correct order
                 SwingUtilities.invokeLater {
-                    // Remove loading indicator
-                    removeLastMessageIfThinking()
+                    // Remove the loading message
+                    chatPanel.remove(loadingMessage)
                     
                     // Add all message panels in order
                     for (panel in messagePanels) {
                         chatPanel.add(panel)
                     }
                     
-                    // Add a separator to indicate where new messages will start
-                    val separatorPanel = createSimpleMessagePanel(
-                        "Continuing this conversation. Any new messages will be part of this session.",
-                        isUser = false
-                    )
-                    chatPanel.add(separatorPanel)
+//                    // Add a separator to indicate where new messages will start
+//                    val separatorPanel = createSimpleMessagePanel(
+//                        "Continuing this conversation. Any new messages will be part of this session.",
+//                        isUser = false
+//                    )
+//                    chatPanel.add(separatorPanel)
                     
                     // Revalidate and repaint the chat panel
                     chatPanel.revalidate()
                     chatPanel.repaint()
                     
-                    // Scroll to bottom
-                    SwingUtilities.invokeLater {
-                        val vertical = chatScroll.verticalScrollBar
-                        vertical.value = vertical.maximum
-                    }
+                    scrollToBottom()
                 }
             } catch (e: Exception) {
                 SwingUtilities.invokeLater {
@@ -1193,6 +1194,20 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         layout.show(contentPanel, "main")
     }
 
+    private fun scrollToBottom() {
+        val scrollBar = chatScroll.verticalScrollBar
+        scrollBar.value = scrollBar.maximum
+        // Force a repaint to ensure smooth scrolling
+        chatScroll.repaint()
+        
+        // Sometimes content is still being laid out, so schedule another check
+        Timer(100) { _ ->
+            SwingUtilities.invokeLater {
+                scrollBar.value = scrollBar.maximum
+            }
+        }.isRepeats = false
+    }
+
     fun appendMessage(message: String, isUser: Boolean) {
         // Create message panel using our helper method
         val messagePanel = createMessagePanel(message, isUser)
@@ -1203,11 +1218,10 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             chatPanel.revalidate()
             chatPanel.repaint()
 
-            // Scroll to bottom
-            SwingUtilities.invokeLater {
-                val vertical = chatScroll.verticalScrollBar
-                vertical.value = vertical.maximum
-            }
+            // Scroll to bottom after a small delay to ensure layout is complete
+            Timer(50) { _ ->
+                scrollToBottom()
+            }.isRepeats = false
         }
     }
 
@@ -1335,7 +1349,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
                                 // Create agent message with WhatsApp-like layout
                                 val bubbleContainer = JBPanel<JBPanel<*>>(VerticalLayout(8)).apply {
-                                    background = JBColor(Color(255, 255, 255), Color(60, 63, 65))
+                                    background = JBColor(Gray._255, Color(60, 63, 65))
                                     border = JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
                                 }
 
@@ -1373,10 +1387,8 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                     while (true) {
                                         val rawLine = reader.readLine() ?: break
                                         lineCount++
-                                        println("[STREAM] line: $rawLine")
                                         if (!rawLine.startsWith("data: ")) continue
                                         val data = rawLine.substringAfter("data: ").trim()
-                                        println("[STREAM] data: $data")
                                         if (data == "[DONE]") break
 
                                         // Accumulate JSON block, handling multi-line objects
@@ -1384,7 +1396,6 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                         var braceCount = data.count { it == '{' } - data.count { it == '}' }
                                         while (braceCount > 0) {
                                             val nextLine = reader.readLine() ?: break
-                                            println("[STREAM] continuation: $nextLine")
                                             sb.append(nextLine)
                                             braceCount += nextLine.count { it == '{' } - nextLine.count { it == '}' }
                                         }
@@ -1420,12 +1431,14 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
                                                 }
                                             } else {
                                                 val block = ContentParser.parseBlock(jsonObj)
+                                                println("[STREAM] parsed block in else: $block")
                                                 val comp = when (block) {
                                                     is Block.Paragraph -> ContentRenderer.renderParagraph(block)
                                                     is Block.Code -> ContentRenderer.renderCode(block)
                                                     is Block.Command -> ContentRenderer.renderCommand(block)
                                                     is Block.ListBlock -> ContentRenderer.renderList(block)
                                                     is Block.Heading -> ContentRenderer.renderHeading(block)
+                                                    is Block.Callout -> ContentRenderer.renderCallout(block)
                                                     else -> null
                                                 }
                                                 comp?.let {

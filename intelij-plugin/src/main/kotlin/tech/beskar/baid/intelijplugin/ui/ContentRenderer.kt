@@ -16,6 +16,7 @@ import java.awt.BorderLayout
 import javax.swing.JButton
 import javax.swing.JComponent
 import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.ui.Gray
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
 import java.awt.Color
@@ -41,9 +42,10 @@ object ContentRenderer {
             else -> label.font.deriveFont(label.font.style, 14f)
         }
         label.font = font
-        label.border = getMessageWidth().let { JBUI.Borders.empty(6) }
-        println("Heading content: $content")
-        
+        // Set width constraint but let height adjust to content
+        label.preferredSize = Dimension(getMessageWidth() - 20, label.preferredSize.height)
+        label.border = JBUI.Borders.empty(6)
+
         // Animate heading text appearance
         SwingUtilities.invokeLater {
             animateTextAppearance(label, content, false, 150)
@@ -104,10 +106,10 @@ object ContentRenderer {
             antiAliasingEnabled = true
             
             // Dark theme with higher contrast for better readability
-            background = JBColor(Color(30, 30, 30), Color(25, 25, 25)) // Darker background
-            foreground = JBColor(Color(220, 220, 220), Color(230, 230, 230)) // Brighter text for better contrast
-            caretColor = JBColor(Color(220, 220, 220), Color(230, 230, 230))
-            currentLineHighlightColor = JBColor(Color(45, 45, 45), Color(40, 40, 40)) // Subtle highlight
+            background = JBColor(Gray._30, Gray._25) // Darker background
+            foreground = JBColor(Gray._220, Gray._230) // Brighter text for better contrast
+            caretColor = JBColor(Gray._220, Gray._230)
+            currentLineHighlightColor = JBColor(Gray._45, Gray._40) // Subtle highlight
             font = Font(Font.MONOSPACED, Font.PLAIN, 13)
             tabSize = 4
             paintTabLines = true
@@ -140,14 +142,14 @@ object ContentRenderer {
             preferredSize = Dimension(getMessageWidth(), calculatedHeight)
             
             // Ensure gutter (line numbers area) has proper styling for dark theme
-            gutter.background = JBColor(Color(25, 25, 25), Color(20, 20, 20)) // Slightly darker than main background
-            gutter.borderColor = JBColor(Color(25, 25, 25), Color(20, 20, 20))
-            gutter.lineNumberColor = JBColor(Color(150, 150, 150), Color(160, 160, 160)) // Brighter line numbers
+            gutter.background = JBColor(Gray._25, Gray._20) // Slightly darker than main background
+            gutter.borderColor = JBColor(Gray._25, Gray._20)
+            gutter.lineNumberColor = JBColor(Gray._150, Gray._160) // Brighter line numbers
         }
         // Wrap scroll and copy button in a panel
         val wrapper = JBPanel<JBPanel<*>>(BorderLayout()).apply {
-            border = BorderFactory.createLineBorder(JBColor(Color(60, 60, 60), Color(50, 50, 50)), 1) // Subtle border
-            background = JBColor(Color(30, 30, 30), Color(25, 25, 25)) // Match text area background
+            border = BorderFactory.createLineBorder(JBColor(Gray._60, Gray._50), 1) // Subtle border
+            background = JBColor(Gray._30, Gray._25) // Match text area background
             
             // Use the same calculated height as the scroll pane
             preferredSize = Dimension(getMessageWidth(), calculatedHeight)
@@ -158,12 +160,12 @@ object ContentRenderer {
             toolTipText = "Copy code"
             addActionListener { CopyPasteManager.getInstance().setContents(StringSelection(block.content)) }
             background = JBColor(Color(86, 156, 214), Color(86, 156, 214)) // VS Code-inspired blue
-            foreground = JBColor(Color(255, 255, 255), Color(255, 255, 255)) // White text for better contrast
+            foreground = JBColor(Gray._255, Gray._255) // White text for better contrast
             border = BorderFactory.createEmptyBorder(3, 8, 3, 8)
             cursor = Cursor(Cursor.HAND_CURSOR)
         }
         val btnPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.RIGHT)).apply {
-            background = JBColor(Color(30, 30, 30), Color(25, 25, 25)) // Match container background
+            background = JBColor(Gray._30, Gray._25) // Match container background
             isOpaque = true
             add(copyBtn)
         }
@@ -190,8 +192,10 @@ object ContentRenderer {
     }
 
     fun renderList(block: Block.ListBlock): JComponent {
-        val panel = JBPanel<JBPanel<*>>(VerticalLayout(8))
-        panel.border = JBUI.Borders.empty(4, 8, 4, 8)
+        val panel = JBPanel<JBPanel<*>>(VerticalLayout(8)).apply {
+            border = JBUI.Borders.empty(4, 8)
+            isOpaque = false  // Make panel transparent to show parent's background
+        }
         
         try {
             // Create and add list items with a slight increasing delay for each item
@@ -206,8 +210,10 @@ object ContentRenderer {
                 val html = "<html><div style='width:${getMessageWidth() - 40}px;'><span style='font-weight:bold;'>$prefix</span> $processedContent</div></html>"
                 
                 // Create and configure the label (initially empty)
-                val label = JBLabel()
-                label.border = JBUI.Borders.empty(2)
+                val label = JBLabel().apply {
+                    border = JBUI.Borders.empty(2)
+                    isOpaque = false  // Make label transparent to show parent's background
+                }
                 
                 // Add to panel with try-catch to handle any rendering exceptions
                 try {
@@ -223,8 +229,10 @@ object ContentRenderer {
                     }
                 } catch (_: Exception) {
                     // Fallback to plain text if HTML rendering fails
-                    val plainLabel = JBLabel()
-                    plainLabel.border = JBUI.Borders.empty(2)
+                    val plainLabel = JBLabel().apply {
+                        border = JBUI.Borders.empty(2)
+                        isOpaque = false  // Make label transparent to show parent's background
+                    }
                     panel.add(plainLabel)
                     
                     // Animate plain text with delay
@@ -238,7 +246,7 @@ object ContentRenderer {
             }
         } catch (e: Exception) {
             // Add a fallback component if list rendering completely fails
-            val errorLabel = JBLabel("<html><div style='color:red;'>Error rendering list: ${e.message}</div></html>")
+            val errorLabel = JBLabel("<html><div style='color:red;'>Error rendering ${e.message}</div></html>")
             panel.add(errorLabel)
         }
         
@@ -285,7 +293,9 @@ object ContentRenderer {
         titleLabel.foreground = JBColor.foreground()
         
         // Process the content to preserve newlines
-        val processedContent = block.content.replace("\n", "<br>")
+        var processedContent = block.content.replace("\n", "<br><br>")
+        processedContent = processedContent.replace(Regex("\\*\\*(.*?)\\*\\*"), "<b>$1</b>")
+
         val contentLabel = JBLabel()
         contentLabel.foreground = JBColor.foreground()
         
@@ -331,8 +341,8 @@ object ContentRenderer {
                 JBColor(Color(80, 200, 120), Color(76, 175, 80))
             )
             else -> Pair(
-                JBColor(Color(242, 242, 242), Color(50, 50, 50)),
-                JBColor(Color(204, 204, 204), Color(100, 100, 100))
+                JBColor(Gray._242, Gray._50),
+                JBColor(Gray._204, Gray._100)
             )
         }
     }
