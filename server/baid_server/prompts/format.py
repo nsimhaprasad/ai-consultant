@@ -36,7 +36,7 @@ RESPONSE FORMAT:
         },
         {
           "type": "code",
-          "language": "kotlin",  # or "java", "python", etc.
+          "language": "kotlin",  # "python", "java", "csharp", "javascript", "ruby". Make sure its one of the supported languages
           "content": "fun main() {\n    println(\"Hello World\")\n}",
           "filename": "Example.kt",  # Optional
           "highlight": [1, 3],  # Optional: line numbers to highlight

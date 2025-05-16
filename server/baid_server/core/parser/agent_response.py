@@ -6,7 +6,7 @@ class FunctionCallResponse(Exception):
     def __init__(self):
         super().__init__("Function call response")
 
-def parse_agent_response(response_chunk):
+def parse_agent_response(response_chunk, is_ci=False):
     if isinstance(response_chunk, bytes):
         chunk_str = response_chunk.decode('utf-8')
     else:
@@ -27,10 +27,12 @@ def parse_agent_response(response_chunk):
             raise ValueError("Could not extract JSON from chunk")
 
         inner_json_str = match.group(2).encode('utf-8').decode('unicode_escape')
-        # Handle escape sequences manually
-        inner_json_str = inner_json_str.replace('\\\\', '\\').replace('\\n', '\n')
-        # Fix any invalid escape sequences
-        inner_json_str = re.sub(r'\\([^"\\/bfnrtu])', r'\1', inner_json_str)
+        if is_ci:
+            # Handle escape sequences manually
+            inner_json_str = inner_json_str.replace('\\n', '\n')
+            inner_json_str = inner_json_str.replace('\\\\', '\\').replace('\\n', '\n')
+            # Fix any invalid escape sequences
+            inner_json_str = re.sub(r'\\([^"\\/bfnrtu])', r'\1', inner_json_str)
 
         inner_data = json.loads(inner_json_str)
         return inner_data
@@ -74,7 +76,7 @@ def parse_agent_stream(stream_response):
 def parse_ci_response(stream_response):
     for chunk in stream_response:
         try:
-            ci_response = parse_agent_response(chunk)
+            ci_response = parse_agent_response(chunk, is_ci=True)
 
             yield ci_response
         except ValueError as e:
