@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS user_status (
 
 -- Insert default global token limit
 INSERT INTO global_settings (setting_key, setting_value, description)
-VALUES ('default_token_limit', '100000', 'Default token limit for all users')
+VALUES ('default_token_limit', '10000000', 'Default token limit for all users')
 ON CONFLICT (setting_key) DO UPDATE SET
     setting_value = EXCLUDED.setting_value,
     updated_at = CURRENT_TIMESTAMP;
