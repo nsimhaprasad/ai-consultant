@@ -7,6 +7,7 @@ import dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from baid_server.api.middleware import TokenLimitMiddleware
 
@@ -138,6 +139,10 @@ app.include_router(api_key)
 app.include_router(auth_api_key)
 app.include_router(ci_error)
 app.include_router(users)
+
+# Mount static files directory
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Application entry point
 if __name__ == "__main__":
