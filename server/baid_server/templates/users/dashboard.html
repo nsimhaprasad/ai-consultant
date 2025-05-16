@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management Dashboard</title>
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --danger-color: #ef476f;
+            --success-color: #06d6a0;
+            --warning-color: #ffd166;
+            --info-color: #118ab2;
+            --text-color: #2b2d42;
+            --bg-color: #f8f9fa;
+            --card-bg: #fff;
+            --border-color: #e9ecef;
+            --muted-text: #6c757d;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            padding: 20px;
+            font-size: 15px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .settings-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        
+        .settings-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        
+        .settings-content {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 20px;
+            justify-content: space-between;
+        }
+        
+        .settings-info {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .settings-label {
+            font-size: 14px;
+            color: var(--muted-text);
+            margin-bottom: 5px;
+        }
+        
+        .settings-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--info-color);
+        }
+        
+        .settings-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .settings-input {
+            width: 150px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+        
+        .settings-input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+        }
+        
+        .formatted-number {
+            display: inline-block;
+            width: 150px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 15px;
+            background-color: var(--bg-color);
+            cursor: text;
+            transition: border-color 0.2s;
+            text-align: right;
+        }
+        
+        .formatted-number:hover {
+            border-color: var(--primary-color);
+        }
+        
+        .dashboard-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .dashboard-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+        
+        td:last-child {
+            text-align: left;
+            white-space: nowrap;
+        }
+        
+        /* Toggle Switch Styles */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--danger-color);
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--success-color);
+        }
+        
+        input:focus + .slider {
+            box-shadow: 0 0 1px var(--success-color);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(30px);
+        }
+        
+        .status-label {
+            display: inline-block;
+            font-weight: 500;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+        
+        th {
+            background-color: rgba(0, 0, 0, 0.02);
+            font-weight: 600;
+            color: var(--muted-text);
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+        
+        tr:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #3a5bd9;
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #d32f2f;
+        }
+        
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #388e3c;
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        .btn-outline:hover {
+            background-color: rgba(74, 108, 247, 0.1);
+        }
+        
+        .token-input {
+            width: 120px;
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .token-input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-active {
+            background-color: rgba(6, 214, 160, 0.15);
+            color: var(--success-color);
+            border: 1px solid rgba(6, 214, 160, 0.3);
+        }
+        
+        .status-restricted {
+            background-color: rgba(239, 71, 111, 0.15);
+            color: var(--danger-color);
+            border: 1px solid rgba(239, 71, 111, 0.3);
+        }
+        
+        .action-cell {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: flex-start;
+            white-space: nowrap;
+        }
+        
+        .bulk-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .bulk-input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 350px;
+        }
+        
+        .notification {
+            background-color: white;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            margin-bottom: 10px;
+            animation: slideIn 0.3s ease forwards;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            font-weight: 600;
+        }
+        
+        .notification-body {
+            padding: 10px 15px;
+        }
+        
+        .notification-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        
+        .notification-progress {
+            height: 4px;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        .notification-progress-bar {
+            height: 100%;
+            width: 100%;
+            animation: progress 5s linear forwards;
+        }
+        
+        @keyframes progress {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+        
+        .notification-success .notification-header {
+            background-color: var(--success-color);
+            color: white;
+        }
+        
+        .notification-success .notification-progress-bar {
+            background-color: var(--success-color);
+        }
+        
+        .notification-error .notification-header {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .notification-error .notification-progress-bar {
+            background-color: var(--danger-color);
+        }
+        
+        .notification-warning .notification-header {
+            background-color: var(--warning-color);
+            color: white;
+        }
+        
+        .notification-warning .notification-progress-bar {
+            background-color: var(--warning-color);
+        }
+        
+        .notification-info .notification-header {
+            background-color: var(--info-color);
+            color: white;
+        }
+        
+        .notification-info .notification-progress-bar {
+            background-color: var(--info-color);
+        }
+        
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            height: 8px;
+            margin-top: 5px;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            border-radius: 4px;
+            background-color: #3498db;
+        }
+        
+        .progress-bar.warning {
+            background-color: #f39c12;
+        }
+        
+        .progress-bar.danger {
+            background-color: #e74c3c;
+        }
+        
+        .token-usage {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .token-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 10px;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .user-details {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .user-email {
+            font-weight: 500;
+        }
+        
+        .user-name {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            color: var(--muted-text);
+            margin-top: 2px;
+            font-style: italic;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 500px;
+            animation: modalIn 0.3s ease forwards;
+        }
+        
+        @keyframes modalIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .modal-btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .modal-btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .modal-btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .modal-btn-secondary {
+            background-color: #e0e0e0;
+            color: #333;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .dashboard-actions {
+                margin-top: 10px;
+            }
+            
+            table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">User Management</h1>
+        </div>
+        
+        <div class="settings-card">
+            <div class="settings-header">
+                <h2 class="settings-title">Global Settings</h2>
+            </div>
+            <div class="settings-content">
+                <div class="settings-info">
+                    <div class="settings-label">Default Token Limit for New Users</div>
+                    <div class="settings-value">{{ '{:,}'.format(default_token_limit) }}</div>
+                    <p style="margin-top: 8px; color: var(--muted-text); font-size: 13px;">
+                        This limit will be applied to all newly registered users automatically.
+                    </p>
+                </div>
+                <div class="settings-form">
+                    <input type="number" id="default-token-limit" class="settings-input" value="{{ default_token_limit }}" min="1000" placeholder="New limit">
+                    <button class="btn btn-success" onclick="saveDefaultTokenLimit()">Update Limit</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Users</h2>
+            </div>
+            
+            <div class="bulk-actions">
+                <label>
+                    <input type="checkbox" id="select-all-checkbox"> Select All
+                </label>
+                <div class="bulk-input-group">
+                    <input type="number" id="bulk-token-limit" class="token-input" min="1000" placeholder="Token limit">
+                    <button class="btn btn-outline" onclick="applyBulkTokenLimit()">Apply Limit</button>
+                </div>
+                <button class="btn btn-success" onclick="bulkActivateUsers()">Activate Selected</button>
+                <button class="btn btn-danger" onclick="bulkRestrictUsers()">Restrict Selected</button>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30px"></th>
+                        <th width="25%">User</th>
+                        <th>Status</th>
+                        <th>Messages</th>
+                        <th width="20%">Token Usage</th>
+                        <th>Token Limit</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="user-checkbox" data-user-id="{{ user.email }}">
+                        </td>
+                        <td>
+                            <div class="user-info">
+                                {% if user.picture %}
+                                <img src="{{ user.picture }}" alt="{{ user.name or user.email }}" class="user-avatar">
+                                {% else %}
+                                <div class="user-avatar" style="background-color: #e0e0e0; display: flex; align-items: center; justify-content: center;">
+                                    {{ user.email[0]|upper }}
+                                </div>
+                                {% endif %}
+                                <div class="user-details">
+                                    <span class="user-email">{{ user.email }}</span>
+                                    {% if user.name %}
+                                    <span class="user-name">{{ user.name }}</span>
+                                    {% endif %}
+                                    {% if user.last_active_relative %}
+                                    <span class="timestamp">Last active: {{ user.last_active_relative }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status-badge status-{{ user.status|lower }}">{{ user.status }}</span>
+                        </td>
+                        <td>{{ user.message_count }}</td>
+                        <td>
+                            <div class="token-usage">
+                                <div class="token-stats">
+                                    <span>{{ '{:,}'.format(user.token_count) }} / {{ '{:,}'.format(user.token_limit) }} tokens</span>
+                                    <span>{{ user.token_percentage }}%</span>
+                                </div>
+                                <div class="progress-container">
+                                    <div class="progress-bar{% if user.token_percentage > 90 %} danger{% elif user.token_percentage > 70 %} warning{% endif %}" style="width: {{ user.token_percentage }}%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="bulk-input-group">
+                                <input type="number" class="token-input" data-user-id="{{ user.email }}" value="{{ user.token_limit }}" min="1000">
+                                <button class="btn btn-outline" onclick="saveTokenLimit('{{ user.email }}')">Save</button>
+                            </div>
+                        </td>
+                        <td style="text-align: left;">
+                            {% if user.status|lower == 'active' %}
+                            <button class="btn btn-danger" onclick="toggleUserStatus('{{ user.email }}', '{{ user.status }}')">Restrict</button>
+                            {% else %}
+                            <button class="btn btn-success" onclick="toggleUserStatus('{{ user.email }}', '{{ user.status }}')">Activate</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Notification container -->
+    <div id="notification-container" class="notification-container"></div>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title" class="modal-title">Confirm Action</h3>
+            </div>
+            <div class="modal-body">
+                <p id="modal-body">Are you sure you want to perform this action?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" onclick="closeModal('confirm-modal')">Cancel</button>
+                <button id="modal-confirm" class="modal-btn modal-btn-primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/users-dashboard.js"></script>
+</body>
+</html>
