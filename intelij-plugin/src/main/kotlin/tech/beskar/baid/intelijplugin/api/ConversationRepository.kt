@@ -156,7 +156,7 @@ class ConversationRepository(private val apiService: BaidApiService) {
                         content
                     }
                     
-                    messages.add(Message(processedContent, isUser, sessionId))
+                    messages.add(Message(processedContent, isUser))
                 }
                 
                 SwingUtilities.invokeLater {

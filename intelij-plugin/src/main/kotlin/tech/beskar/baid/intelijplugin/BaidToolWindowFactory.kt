@@ -7,7 +7,7 @@ import com.intellij.ui.content.ContentFactory
 
 class BaidToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val panel = BaidToolWindowPanel(project)
+        val panel = BaidToolWindowPanelMVC(project)
         val contentFactory = ContentFactory.getInstance()
         val content = contentFactory.createContent(panel, "", false)
         toolWindow.contentManager.addContent(content)

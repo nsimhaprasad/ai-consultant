@@ -7,6 +7,7 @@ import com.intellij.ide.BrowserUtil
 import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
@@ -29,6 +30,7 @@ import java.util.concurrent.CompletableFuture
 import javax.swing.JButton
 import javax.swing.SwingUtilities
 
+@Service
 class GoogleAuthService {
     companion object {
         private val LOG = Logger.getInstance(GoogleAuthService::class.java)
@@ -44,12 +46,6 @@ class GoogleAuthService {
         val email: String,
         val name: String,
         val picture: String?
-    )
-
-    data class TokenInfo(
-        val accessToken: String,
-        val refreshToken: String?,
-        val expiresIn: Long
     )
 
     data class BackendTokenInfo(

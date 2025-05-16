@@ -1,15 +1,9 @@
 package tech.beskar.baid.intelijplugin.model
 
-/**
- * Data model for parsed content responses from the server.
- */
 data class ContentResponse(
     val blocks: List<Block>
 )
 
-/**
- * Represents a generic content block. Subclasses define specific block types.
- */
 sealed class Block {
     data class Paragraph(
         val content: String,
@@ -51,9 +45,6 @@ enum class Target {
     GRADLE
 }
 
-/**
- * Parameters for different command types.
- */
 sealed class Parameters {
     data class CreateFileParams(
         val path: String,

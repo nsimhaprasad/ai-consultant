@@ -154,11 +154,11 @@ class ChatController(
                             // This matches the behavior in the original implementation
                             val processedMessages = messages.map { message ->
                                 // Ensure message has the correct session ID
-                                if (message.sessionId != sessionId) {
-                                    message.copy(sessionId = sessionId)
-                                } else {
+//                                if (message.sessionId != sessionId) {
+//                                    message.copy(sessionId = sessionId)
+//                                } else {
                                     message
-                                }
+//                                }
                             }
                             
                             // Call the success callback with the processed messages
