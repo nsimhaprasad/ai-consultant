@@ -143,6 +143,9 @@ class BaidAPIService private constructor() {
                                         updatedSessionId[0] = jsonObj.optString("session_id", "")
                                     } else {
                                         // Process content block
+                                        if (jsonObj.has("error")) {
+                                            throw Exception(jsonObj.getString("error"))
+                                        }
                                         SwingUtilities.invokeLater { onStreamedBlock.accept(jsonObj) }
                                     }
                                 } catch (e: Exception) {

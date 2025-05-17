@@ -132,6 +132,9 @@ class ChatPanelView(private val project: Project?) :
             try {
                 val icon = IconLoader.getIcon("/icons/beskar.svg", ChatPanelView::class.java)
                 avatarLabel.setIcon(icon)
+                avatarLabel.verticalAlignment = JLabel.TOP
+                // Add some padding to ensure proper positioning
+                avatarLabel.setBorder(JBUI.Borders.emptyRight(JBUI.scale(8)))
             } catch (e: Exception) {
                 LOG.warn("Failed to load Beskar icon", e)
                 avatarLabel = JLabel("AI")

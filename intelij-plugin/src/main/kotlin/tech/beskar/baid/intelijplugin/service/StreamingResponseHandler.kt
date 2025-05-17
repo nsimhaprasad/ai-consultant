@@ -56,7 +56,7 @@ object StreamingResponseHandler {
     }
 
     fun createErrorBlock(error: Throwable): Block {
-        var message = "Sorry, I encountered an error: " + error.message
+        var message = "Sorry, I encountered an error: Please try again!"
 
 
         // Check for common error types
