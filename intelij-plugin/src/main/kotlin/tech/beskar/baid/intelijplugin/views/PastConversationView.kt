@@ -73,12 +73,12 @@ class PastConversationsView(private val project: Project?, private val onSession
         headerPanel.setBorder(JBUI.Borders.empty(JBUI.scale(16)))
 
 
-        // Add back button
-        backButton = JButton("Back to Chat")
-        backButton!!.setIcon(AllIcons.General.ArrowLeft)
-        backButton!!.setContentAreaFilled(false)
-        backButton!!.setBorderPainted(false)
-        backButton!!.setFocusPainted(false)
+//        // Add back button
+//        backButton = JButton("Back to Chat")
+//        backButton!!.setIcon(AllIcons.General.ArrowLeft)
+//        backButton!!.setContentAreaFilled(false)
+//        backButton!!.setBorderPainted(false)
+//        backButton!!.setFocusPainted(false)
 
 
         // Add title
@@ -86,15 +86,15 @@ class PastConversationsView(private val project: Project?, private val onSession
         titleLabel.setFont(Font(titleLabel.getFont().getName(), Font.BOLD, JBUI.scale(16)))
         titleLabel.setForeground(JBColor.foreground())
 
-        headerPanel.add(backButton!!, BorderLayout.WEST)
+//        headerPanel.add(backButton!!, BorderLayout.WEST)
         headerPanel.add(titleLabel, BorderLayout.CENTER)
 
         return headerPanel
     }
 
-    fun setBackAction(action: Runnable) {
-        backButton!!.addActionListener { e: ActionEvent? -> action.run() }
-    }
+//    fun setBackAction(action: Runnable) {
+//        backButton!!.addActionListener { e: ActionEvent? -> action.run() }
+//    }
 
     fun loadConversations() {
         // Show loading status
@@ -138,10 +138,8 @@ class PastConversationsView(private val project: Project?, private val onSession
 
                 // Add each session
                 for (session in sessions) {
-                    if (session != null) {
-                        val sessionPanel = createSessionPanel(session)
-                        conversationsPanel!!.add(sessionPanel)
-                    }
+                    val sessionPanel = createSessionPanel(session)
+                    conversationsPanel!!.add(sessionPanel)
                 }
             }
 

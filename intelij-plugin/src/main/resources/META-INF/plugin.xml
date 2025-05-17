@@ -25,7 +25,6 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="Baid" anchor="right" factoryClass="tech.beskar.baid.intelijplugin.BaidToolWindowFactory" icon="/icons/beskar.svg" secondary="true"/>
-        <applicationService serviceImplementation="tech.beskar.baid.intelijplugin.auth.GoogleAuthService"/>
         <notificationGroup id="Baid Notifications" displayType="BALLOON" />
     </extensions>
 </idea-plugin>

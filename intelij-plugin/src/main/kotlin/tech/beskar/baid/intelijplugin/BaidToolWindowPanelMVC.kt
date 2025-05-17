@@ -112,12 +112,12 @@ class BaidToolWindowPanelMVC(private val project: Project) : JBPanel<BaidToolWin
 
 
         // Configure back button in past conversations view
-        pastConversationsView.setBackAction {
-            isShowingPastConversations = false
-            chatCardLayout.show(chatContainer, "chat")
-            pastConversationsButton.setIcon(AllIcons.General.ArrowRight)
-            pastConversationsButton.setToolTipText("Past conversations")
-        }
+//        pastConversationsView.setBackAction {
+//            isShowingPastConversations = false
+//            chatCardLayout.show(chatContainer, "chat")
+//            pastConversationsButton.setIcon(AllIcons.General.ArrowRight)
+//            pastConversationsButton.setToolTipText("Past conversations")
+//        }
     }
 
     private fun setupHeaderPanel(): JBPanel<JBPanel<*>?> {

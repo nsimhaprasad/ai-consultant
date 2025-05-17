@@ -14,15 +14,6 @@ class ChatSession {
     var isActive: Boolean
 
 
-    constructor(userId: String?) {
-        this.userId = userId
-        this.messages = ArrayList<Message>()
-        this.createdAt = Date()
-        this.lastUsedAt = Date()
-        this.isActive = true
-    }
-
-
     constructor(sessionId: String?, userId: String?, createdAt: Date?) {
         this.sessionId = sessionId
         this.userId = userId
@@ -30,12 +21,6 @@ class ChatSession {
         this.createdAt = createdAt
         this.lastUsedAt = Date()
         this.isActive = true
-    }
-
-
-    fun addMessage(message: Message?) {
-        messages.add(message!!)
-        lastUsedAt = Date()
     }
 
 
@@ -50,45 +35,19 @@ class ChatSession {
 
 
         // Update last used timestamp
-        lastUsedAt = Date()
-    }
-
-    val firstUserMessage: Message?
-        get() {
-            for (message in messages) {
-                if (message.isUser) {
-                    return message
-                }
-            }
-            return null
+        val timestampStr = messagesArray.getJSONObject(messagesArray.length() - 1).getString("timestamp")
+        try {
+            val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+            lastUsedAt = format.parse(timestampStr)
+        } catch (e: Exception) {
+            println("Error parsing timestamp: ${e.message}")
+            lastUsedAt = Date()
         }
-
-    fun getPreviewText(maxLength: Int): String {
-        val firstMessage = this.firstUserMessage
-        if (firstMessage == null) {
-            return "Empty conversation"
-        }
-
-        val content = firstMessage.content
-        if (content.length > maxLength) {
-            return content.substring(0, maxLength) + "..."
-        }
-        return content
     }
 
     fun getMessages(): MutableList<Message?> {
         return ArrayList<Message?>(messages)
     }
-
-    val formattedLastUsedDate: String?
-        get() {
-            try {
-                val displayFormat = SimpleDateFormat("MM/dd/yyyy h:mm a")
-                return displayFormat.format(lastUsedAt)
-            } catch (e: Exception) {
-                return lastUsedAt.toString()
-            }
-        }
 
     companion object {
         fun fromJson(sessionJson: JSONObject): ChatSession {

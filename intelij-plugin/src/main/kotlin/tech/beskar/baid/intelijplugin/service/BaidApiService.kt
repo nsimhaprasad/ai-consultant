@@ -193,6 +193,7 @@ class BaidAPIService private constructor() {
                 val sessions = jsonResponse.getJSONArray("sessions")
 
                 val sessionPreviews: MutableList<SessionPreview?> = ArrayList<SessionPreview?>()
+                println("Sessions: $sessions")
                 for (i in 0..<sessions.length()) {
                     val sessionJson = sessions.getJSONObject(i)
                     val preview: SessionPreview? = SessionPreview.fromJson(sessionJson)

@@ -18,31 +18,11 @@ class Message {
         this.role = if (isUser) "user" else "assistant"
     }
 
-    constructor(content: String, isUser: Boolean, timestamp: Date?) {
-        this.content = content
-        this.isUser = isUser
-        this.timestamp = timestamp
-        this.role = if (isUser) "user" else "assistant"
-    }
-
     constructor(content: String, role: String?, timestamp: Date?) {
         this.content = content
         this.role = role
         this.isUser = "user" == role
         this.timestamp = timestamp
-    }
-
-    fun toJson(): JSONObject {
-        val json = JSONObject()
-        json.put("message", content)
-        json.put("role", role)
-
-
-        // Format timestamp
-        val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-        json.put("timestamp", format.format(timestamp))
-
-        return json
     }
 
     fun containsJsonBlocks(): Boolean {
@@ -68,7 +48,6 @@ class Message {
             val content = messageJson.getString("message")
             val role = messageJson.getString("role")
 
-
             // Parse timestamp if available
             var timestamp: Date? = Date()
             try {
@@ -78,7 +57,7 @@ class Message {
                     timestamp = format.parse(timestampStr)
                 }
             } catch (e: Exception) {
-                // Use current date if parsing fails
+                println("Error parsing timestamp: ${e.message}")
             }
 
             return Message(content, role, timestamp)

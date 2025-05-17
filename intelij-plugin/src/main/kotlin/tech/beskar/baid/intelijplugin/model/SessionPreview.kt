@@ -1,7 +1,6 @@
 package tech.beskar.baid.intelijplugin.model
 
 import org.json.JSONObject
-import java.text.SimpleDateFormat
 import java.util.*
 
 
@@ -14,10 +13,10 @@ class SessionPreview
     val formattedLastUsedDate: String?
         get() {
             try {
-                val displayFormat = SimpleDateFormat("MM/dd/yyyy h:mm a")
-                return displayFormat.format(lastUsedAt)
-            } catch (e: Exception) {
                 return lastUsedAt.toString()
+            } catch (e: Exception) {
+                println("Error formatting last used date: ${e.message}")
+                return Date().toString()
             }
         }
 
@@ -39,17 +38,16 @@ class SessionPreview
             val sessionId = sessionJson.getString("session_id")
             val userId = sessionJson.optString("user_id", "")
 
-
             // Parse last used date
             var lastUsedAt = Date()
             try {
                 if (sessionJson.has("last_used_at")) {
                     val lastUsedAtStr = sessionJson.getString("last_used_at")
-                    val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-                    lastUsedAt = format.parse(lastUsedAtStr)
+                    val formatter = java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
+                    lastUsedAt = Date.from(java.time.Instant.from(formatter.parse(lastUsedAtStr)))
                 }
             } catch (e: Exception) {
-                // Use current date if parsing fails
+                println("Error parsing last used date: ${e.message}")
             }
 
             return SessionPreview(sessionId, userId, lastUsedAt)

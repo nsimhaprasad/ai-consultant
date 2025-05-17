@@ -136,9 +136,6 @@ class ChatPanelView(private val project: Project?) :
                 LOG.warn("Failed to load Beskar icon", e)
                 avatarLabel = JLabel("AI")
             }
-//
-//            val picture = googleAuthService.getUserInfo()?.picture
-//            val avatarLabel = createAvatarLabel(picture)
 
 
             contentPanel.add(avatarLabel, BorderLayout.WEST)
