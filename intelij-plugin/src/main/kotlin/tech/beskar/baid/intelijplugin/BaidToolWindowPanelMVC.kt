@@ -334,7 +334,12 @@ class BaidToolWindowPanelMVC(private val project: Project) : JBPanel<BaidToolWin
         chatPanel.clearChat()
         apiController.clearCurrentSession()
         // Add welcome message
-        chatPanel.addStreamingBlock(Block.Paragraph("Started a new session."))
+        chatPanel.addMessage(
+            Message(
+                "Hello ${apiController.currentUser?.name}, How can I help you today?",
+                isUser = false
+            )
+        )
         // Re-enable controls
         setControlsEnabled(true)
     }
