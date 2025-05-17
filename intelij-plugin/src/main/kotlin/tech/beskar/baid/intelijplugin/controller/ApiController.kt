@@ -65,18 +65,15 @@ class APIController private constructor() {
         )
     }
 
-    fun isAuthenticated(onComplete: Consumer<Boolean?>) {
-        authController.checkAuthenticationStatus(onComplete)
-    }
-
     val currentUser: UserProfile?
         get() = authController.currentUser
 
-    val currentSessionId: String?
-        get() = sessionController.currentSessionId
-
     fun createErrorBlock(error: Throwable): Block {
         return StreamingResponseHandler.createErrorBlock(error)
+    }
+
+    fun clearCurrentSession() {
+        sessionController.clearCurrentSession()
     }
 
     companion object {

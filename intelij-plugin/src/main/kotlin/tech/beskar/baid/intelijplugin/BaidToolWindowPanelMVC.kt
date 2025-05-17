@@ -152,12 +152,17 @@ class BaidToolWindowPanelMVC(private val project: Project) : JBPanel<BaidToolWin
         pastConversationsButton.setBorderPainted(false)
         pastConversationsButton.setFocusPainted(false)
 
-        val buttonsPanel = JBPanel<JBPanel<*>?>()
-        buttonsPanel.setOpaque(false)
-        buttonsPanel.setLayout(BoxLayout(buttonsPanel, BoxLayout.X_AXIS))
-        buttonsPanel.add(pastConversationsButton)
-        buttonsPanel.add(Box.createHorizontalStrut(JBUI.scale(8)))
-        buttonsPanel.add(newSessionButton)
+        val buttonSize = Dimension(JBUI.scale(24), JBUI.scale(24))
+        pastConversationsButton.preferredSize = buttonSize
+        newSessionButton.preferredSize = buttonSize
+
+        val buttonsPanel = JBPanel<JBPanel<*>?>().apply {
+            isOpaque = false
+            layout = BoxLayout(this, BoxLayout.X_AXIS)
+            add(pastConversationsButton)
+            add(Box.createHorizontalStrut(JBUI.scale(8)))
+            add(newSessionButton)
+        }
 
         headerPanel.add(titleContainer, BorderLayout.WEST)
         headerPanel.add(buttonsPanel, BorderLayout.EAST)
@@ -327,6 +332,7 @@ class BaidToolWindowPanelMVC(private val project: Project) : JBPanel<BaidToolWin
         // Disable buttons
         setControlsEnabled(false)
         chatPanel.clearChat()
+        apiController.clearCurrentSession()
         // Add welcome message
         chatPanel.addStreamingBlock(Block.Paragraph("Started a new session."))
         // Re-enable controls

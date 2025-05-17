@@ -13,15 +13,11 @@ import javax.swing.SwingUtilities
 
 class SessionController private constructor() {
     private val apiService: BaidAPIService = BaidAPIService.getInstance()
-    private val authController: AuthController
+    private val authController: AuthController = AuthController.getInstance()
     var currentSessionId: String? = null
 
     var currentSession: ChatSession? = null
         private set
-
-    init {
-        this.authController = AuthController.getInstance()
-    }
 
 
     fun loadSession(sessionId: String?, onSuccess: Consumer<ChatSession?>, onError: Consumer<Throwable?>) {
