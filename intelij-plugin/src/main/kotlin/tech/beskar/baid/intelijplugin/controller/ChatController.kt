@@ -2,33 +2,26 @@ package tech.beskar.baid.intelijplugin.controller
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import org.json.JSONArray
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.model.Block
 import tech.beskar.baid.intelijplugin.model.FileContext
 import tech.beskar.baid.intelijplugin.model.Message
 import tech.beskar.baid.intelijplugin.service.BaidAPIService
 import tech.beskar.baid.intelijplugin.service.StreamingResponseHandler
+import java.util.*
 import java.util.function.Consumer
 import java.util.function.Function
 import javax.swing.SwingUtilities
 
-
 class ChatController private constructor() {
     private val apiService: BaidAPIService = BaidAPIService.getInstance()
-    private val authController: AuthController
-    private val sessionController: SessionController
+    private val authController: AuthController = AuthController.getInstance()
+    private val sessionController: SessionController = SessionController.getInstance()
 
-    private val currentMessages: MutableList<Message?>
+    private val currentMessages: MutableList<Message?> = ArrayList()
 
     var isProcessingMessage: Boolean = false
         private set
-
-    init {
-        this.authController = AuthController.getInstance()
-        this.sessionController = SessionController.getInstance()
-        this.currentMessages = ArrayList<Message?>()
-    }
 
     fun sendMessage(
         project: Project?,
@@ -94,16 +87,11 @@ class ChatController private constructor() {
                     },
                     { updatedSessionId: String? ->
                         // Create and add AI message with all blocks
-                        if (!responseBlocks.isEmpty()) {
-                            // Convert blocks to a message format
-                            // For simplicity, we'll just create a JSON with the blocks
-                            val messageContent = JSONObject()
-                            messageContent.put("blocks", JSONArray())
-                            for (block in responseBlocks) {
-                                // This is simplified - actual implementation would depend on how blocks are structured
-                                messageContent.getJSONArray("blocks").put(JSONObject(block.toString()))
+                        if (responseBlocks.isNotEmpty()) {
+                            // Convert blocks to JSON and create a message
+                            val messageContent = JSONObject().apply {
+                                put("blocks", Block.toJsonArray(responseBlocks))
                             }
-
                             val aiMessage = Message(messageContent.toString(), false)
                             currentMessages.add(aiMessage)
                         }

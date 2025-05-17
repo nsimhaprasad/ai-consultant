@@ -130,7 +130,7 @@ class ChatPanelView(private val project: Project?) :
             // Add AI avatar
             var avatarLabel = JLabel()
             try {
-                val icon = IconLoader.getIcon("/icons/beskar.png", MessageBubblePanel::class.java)
+                val icon = IconLoader.getIcon("/icons/beskar.svg", ChatPanelView::class.java)
                 avatarLabel.setIcon(icon)
             } catch (e: Exception) {
                 LOG.warn("Failed to load Beskar icon", e)
@@ -207,15 +207,17 @@ class ChatPanelView(private val project: Project?) :
         }
     }
 
-    fun sendMessage(content: String) {
+    fun sendMessage(
+        content: String,
+        onComplete: () -> Unit = {},
+        onError: (Throwable) -> Unit = {}
+    ) {
         // Create and add user message
         val userMessage = Message(content, true)
         addMessage(userMessage)
 
-
         // Start streaming response
         startStreamingResponse()
-
 
         // Send to backend
         apiController.sendMessage(
@@ -223,12 +225,16 @@ class ChatPanelView(private val project: Project?) :
             content,
             { message: Message? -> },
             { block: Block? -> this.addStreamingBlock(block) },
-            { this.endStreamingResponse() },
+            {
+                endStreamingResponse()
+                onComplete()
+            },
             { error: Throwable? ->
                 // Handle error
                 endStreamingResponse()
                 val errorBlock = apiController.createErrorBlock(error!!)
                 addStreamingBlock(errorBlock)
+                onError(error)
             }
         )
     }

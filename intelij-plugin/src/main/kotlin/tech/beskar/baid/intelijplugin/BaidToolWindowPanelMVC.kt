@@ -1,5 +1,6 @@
 package tech.beskar.baid.intelijplugin
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBPanel
@@ -100,12 +101,12 @@ class BaidToolWindowPanelMVC(private val project: Project) : JBPanel<BaidToolWin
             if (isShowingPastConversations) {
                 pastConversationsView.loadConversations()
                 chatCardLayout.show(chatContainer, "pastConversations")
-                pastConversationsButton.setIcon(AllIcons.General.ArrowLeft)
-                pastConversationsButton.setToolTipText("Back to current chat")
+//                pastConversationsButton.setIcon(AllIcons.General.ArrowLeft)
+//                pastConversationsButton.setToolTipText("Back to current chat")
             } else {
                 chatCardLayout.show(chatContainer, "chat")
-                pastConversationsButton.setIcon(AllIcons.General.ArrowRight)
-                pastConversationsButton.setToolTipText("Past conversations")
+//                pastConversationsButton.setIcon(AllIcons.General.ArrowRight)
+//                pastConversationsButton.setToolTipText("Past conversations")
             }
         }
 
@@ -234,15 +235,92 @@ class BaidToolWindowPanelMVC(private val project: Project) : JBPanel<BaidToolWin
     }
 
     private fun sendMessage() {
-        val message = inputField.getText().trim { it <= ' ' }
-        if (!message.isEmpty()) {
-            // Clear input field
-            inputField.setText("")
+        val message = inputField.text.trim()
+        if (message.isEmpty()) return
+
+        // Clear input field and disable controls
+        inputField.text = ""
+        setControlsEnabled(false)
 
 
-            // Send message to chat panel
-            chatPanel.sendMessage(message)
+        val task = object : com.intellij.openapi.progress.Task.Backgroundable(project, "Consulting AI", true) {
+            private lateinit var indicator: com.intellij.openapi.progress.ProgressIndicator
+            private var error: Throwable? = null
+
+            private fun cleanup() = SwingUtilities.invokeLater {
+                setControlsEnabled(true)
+                inputField.requestFocus()
+            }
+
+            override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
+                this.indicator = indicator
+                indicator.isIndeterminate = true
+                indicator.text = "Sending your message..."
+
+                try {
+                    val latch = java.util.concurrent.CountDownLatch(1)
+
+                    chatPanel.sendMessage(
+                        content = message,
+                        onComplete = {
+                            indicator.text = "Processing complete"
+                            completeAndCountDown(latch)
+                        },
+                        onError = { e ->
+                            error = e
+                            indicator.text = "Error occurred"
+                            completeAndCountDown(latch)
+                        }
+                    )
+
+                    waitForCompletion(latch)
+                    error?.let { throw it }
+                } catch (e: Exception) {
+                    handleError(e)
+                    throw e
+                }
+            }
+
+            private fun completeAndCountDown(latch: java.util.concurrent.CountDownLatch) {
+                indicator.fraction = 1.0
+                latch.countDown()
+            }
+
+            private fun waitForCompletion(latch: java.util.concurrent.CountDownLatch) {
+                while (!latch.await(100, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                    if (indicator.isCanceled) {
+                        throw java.util.concurrent.CancellationException("Operation cancelled by user")
+                    }
+                    indicator.text = "Cooking the best response for you..."
+                    indicator.text2 = "Processing your request..."
+                }
+            }
+
+            private fun handleError(e: Exception) {
+                indicator.text = if (e is java.util.concurrent.CancellationException) {
+                    "Operation cancelled"
+                } else {
+                    "Error: ${e.message}"
+                }
+                indicator.fraction = 1.0
+            }
+
+            private fun finishOperation() {
+                try {
+                    if (::indicator.isInitialized && !indicator.isCanceled && indicator.isRunning) {
+                        indicator.stop()
+                    }
+                } finally {
+                    cleanup()
+                }
+            }
+
+            override fun onFinished() = finishOperation()
+            override fun onThrowable(error: Throwable) = finishOperation()
+            override fun onCancel() = finishOperation()
         }
+        
+        ProgressManager.getInstance().run(task)
     }
 
     private fun startNewSession() {
