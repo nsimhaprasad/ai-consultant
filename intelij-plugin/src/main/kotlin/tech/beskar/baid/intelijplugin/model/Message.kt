@@ -43,6 +43,10 @@ class Message {
         return !isUser && content.trim().startsWith("{")
     }
 
+    override fun toString(): String {
+        return "Message(content=$content, isUser=$isUser, timestamp=$timestamp, role=$role)"
+    }
+
     companion object {
         fun fromJson(messageJson: JSONObject): Message {
             val content = messageJson.getString("message")
