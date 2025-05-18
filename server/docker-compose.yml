@@ -1,0 +1,29 @@
+version: "3.7"
+services:
+  db:
+    image: "postgres:latest"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ai_consultant_db
+    ports:
+      - "5432:5432"
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: final
+    environment:
+      - DB_ADDRESS=db
+      - DB_PORT=5432
+      - DB_USER=admin
+      - DB_PASSWORD=password
+    ports:
+      - "3001:3001"
+    depends_on:
+      - db
+
+networks:
+  default:
+    name: baid-nt
