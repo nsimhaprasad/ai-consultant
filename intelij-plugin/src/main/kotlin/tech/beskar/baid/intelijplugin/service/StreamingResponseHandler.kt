@@ -6,6 +6,7 @@ import tech.beskar.baid.intelijplugin.model.Block
 import tech.beskar.baid.intelijplugin.model.ContentParser.parseBlock
 import tech.beskar.baid.intelijplugin.model.ContentParser.parseJetbrainsResponse
 import tech.beskar.baid.intelijplugin.model.ContentParser.parseResponse
+import tech.beskar.baid.intelijplugin.service.exceptions.ApiException
 import java.util.function.Consumer
 import javax.swing.SwingUtilities
 
@@ -57,7 +58,9 @@ object StreamingResponseHandler {
 
     fun createErrorBlock(error: Throwable): Block {
         var message = "Sorry, I encountered an error: Please try again!"
-
+        if(error is ApiException){
+            return Block.Paragraph(error.message.toString())
+        }
 
         // Check for common error types
         if (error.message != null) {

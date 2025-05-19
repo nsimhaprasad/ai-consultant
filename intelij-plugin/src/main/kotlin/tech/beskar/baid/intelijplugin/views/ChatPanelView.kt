@@ -230,10 +230,9 @@ class ChatPanelView(private val project: Project?) :
                 onComplete()
             },
             { error: Throwable? ->
-                // Handle error
-                endStreamingResponse()
                 val errorBlock = apiController.createErrorBlock(error!!)
                 addStreamingBlock(errorBlock)
+                endStreamingResponse()
                 onError(error)
             }
         )
