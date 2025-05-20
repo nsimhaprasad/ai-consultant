@@ -8,6 +8,7 @@ import tech.beskar.baid.intelijplugin.model.Block
 import tech.beskar.baid.intelijplugin.model.ChatSession
 import tech.beskar.baid.intelijplugin.model.Message
 import tech.beskar.baid.intelijplugin.model.UserProfile
+import tech.beskar.baid.intelijplugin.model.common.SessionId
 import tech.beskar.baid.intelijplugin.ui.toolwindow.BaidToolWindowActions
 import tech.beskar.baid.intelijplugin.ui.toolwindow.BaidToolWindowView
 import javax.swing.SwingUtilities
@@ -101,9 +102,10 @@ class BaidToolWindowController(
             handleSessionSelectionError("Selected session preview has no ID.")
             return
         }
-        
+
         // Optional UX improvement: view.getChatPanelView().showLoadingState()
-        sessionController.loadConversationDetails(sessionId,
+        sessionController.loadSession(
+            sessionId,
             onSuccess = { loadedSession -> handleLoadedSessionSuccess(loadedSession, sessionId) },
             onError = { error -> handleSessionLoadError(error, sessionId) }
         )
@@ -125,10 +127,10 @@ class BaidToolWindowController(
         view.addMessageToChat(Message("Error: $errorMessage", false))
     }
 
-    private fun handleSessionLoadError(error: Throwable, sessionId: tech.beskar.baid.intelijplugin.model.common.SessionId) {
+    private fun handleSessionLoadError(error: Throwable?, sessionId: SessionId) {
         // Consider using a Logger
-        println("Error loading session ${sessionId.value}: ${error.message}")
-        view.addMessageToChat(Message("Error loading session: ${error.message}", false))
+        println("Error loading session ${sessionId.value}: ${error?.message}")
+        view.addMessageToChat(Message("Error loading session: ${error?.message}", false))
     }
 
     // Renamed handleLoadedSession to be more specific about success
@@ -205,7 +207,7 @@ class BaidToolWindowController(
             onAuthenticated = { userProfile -> // Parameter type inferred
                 view.showMainScreen()
                 view.updateUserProfile(userProfile)
-                view.displayWelcomeMessage(userProfile.name)
+                view.displayWelcomeMessage(userProfile?.name)
             },
             onNotAuthenticated = {
                 view.showLoginScreen()

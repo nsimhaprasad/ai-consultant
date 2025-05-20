@@ -114,7 +114,7 @@ class PastConversationsView(
         // Load conversations
         // APIController.loadPastConversations returned MutableList<SessionPreview>?
         // ISessionController.fetchUserSessionPreviews returns List<SessionPreview?>
-        sessionController.fetchUserSessionPreviews(
+        sessionController.loadSessionPreviews(
             { sessions: List<SessionPreview?>? -> // Adjusted type
                 // Ensure displayConversations can handle List<SessionPreview?>
                 this.displayConversations(sessions?.filterNotNull()?.toMutableList()) // Adapt to existing displayConversations

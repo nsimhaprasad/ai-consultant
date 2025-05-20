@@ -8,8 +8,6 @@ import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
@@ -111,7 +109,7 @@ class GoogleAuthService {
                         return@Thread
                     }
                 } catch (e: Exception) {
-                    LOG.error("Error polling for session", e)
+                    println("Error polling for session ${e.message}")
                 }
                 Thread.sleep(pollInterval)
             }
@@ -176,6 +174,17 @@ class GoogleAuthService {
     fun signOut() {
         clearTokens()
         userInfo = null
+    }
+
+    companion object {
+        private var instance: GoogleAuthService? = null
+
+        fun getInstance(project: Project? = null): GoogleAuthService {
+            return instance ?: synchronized(this) {
+                instance ?: (project?.let { GoogleAuthService() } ?: instance)
+                    ?: throw IllegalStateException("GoogleAuthService must be initialized with a project first")
+            }
+        }
     }
 
     // Clear all saved tokens

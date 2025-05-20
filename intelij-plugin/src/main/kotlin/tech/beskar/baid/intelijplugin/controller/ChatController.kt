@@ -98,7 +98,7 @@ class ChatController constructor( // Made constructor public
                     currentMessages.add(Message(messageContent.toString(), false))
                 }
                 isProcessingMessage = false
-                sessionController.currentSessionId = updatedSessionIdString?.let { tech.beskar.baid.intelijplugin.model.common.SessionId(it) }
+                sessionController.currentSessionId = updatedSessionIdString
                 SwingUtilities.invokeLater(onComplete)
             },
             { error ->

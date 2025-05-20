@@ -2,6 +2,8 @@ package tech.beskar.baid.intelijplugin.model
 
 import org.json.JSONArray
 import org.json.JSONObject
+import tech.beskar.baid.intelijplugin.service.exceptions.ApiException // Added import
+import java.util.concurrent.CancellationException // Added import
 
 data class ContentResponse(
     val blocks: List<Block>
@@ -91,8 +93,7 @@ sealed class Block {
         is Callout -> toJson()
     }
     
-import tech.beskar.baid.intelijplugin.service.exceptions.ApiException // Added import
-import java.util.concurrent.CancellationException // Added import
+
 
     companion object {
         fun toJsonArray(blocks: List<Block>): JSONArray = JSONArray().apply {

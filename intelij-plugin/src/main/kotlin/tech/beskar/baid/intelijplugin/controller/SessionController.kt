@@ -7,7 +7,6 @@ import tech.beskar.baid.intelijplugin.service.IBaidApiService
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.function.Consumer
-import java.util.function.Function
 import javax.swing.SwingUtilities
 
 
@@ -18,10 +17,10 @@ class SessionController constructor(
 
     override var currentSessionId: tech.beskar.baid.intelijplugin.model.common.SessionId? = null
     override var currentSession: ChatSession? = null
-        private set
+        set
 
 
-    override fun loadConversationDetails(sessionId: tech.beskar.baid.intelijplugin.model.common.SessionId?, onSuccess: Consumer<ChatSession?>, onError: Consumer<Throwable?>) {
+    override fun loadSession(sessionId: tech.beskar.baid.intelijplugin.model.common.SessionId?, onSuccess: Consumer<ChatSession?>, onError: Consumer<Throwable?>) {
         executeWithAuthentication(onError) { accessToken, userId ->
             apiService.loadConversationHistory(userId, sessionId, accessToken, { session ->
                 currentSessionId = sessionId
@@ -35,7 +34,7 @@ class SessionController constructor(
     }
 
     // Renamed from loadSessionPreviews and changed onSuccess type
-    override fun fetchUserSessionPreviews(onSuccess: Consumer<List<SessionPreview?>>, onError: Consumer<Throwable?>) {
+    override fun loadSessionPreviews(onSuccess: Consumer<List<SessionPreview>?>, onError: Consumer<Throwable?>) {
         executeWithAuthentication(onError) { accessToken, userId ->
             apiService.fetchUserSessions(userId, accessToken, { previews ->
                 if (previews != null) {
@@ -86,7 +85,7 @@ class SessionController constructor(
         userId: tech.beskar.baid.intelijplugin.model.common.UserId?,
         accessToken: String?,
         previews: MutableList<SessionPreview>,
-        onSuccess: Consumer<List<SessionPreview?>>,
+        onSuccess: Consumer<List<SessionPreview>?>,
         onError: Consumer<Throwable?>? // Nullable if errors in individual previews are non-fatal for the whole op
     ) {
         if (previews.isEmpty()) {
@@ -105,8 +104,8 @@ class SessionController constructor(
                 { previewText: String? ->
                     preview.setTruncatedPreviewText(previewText, 60)
                     // Check if all previews are loaded
-                    completed[0]++
-                    if (completed[0] >= total) {
+                    completedCount[0]++
+                    if (completedCount[0] >= totalPreviews) {
                         onSuccess.accept(previews.toList()) // Return as immutable List
                     }
                 },

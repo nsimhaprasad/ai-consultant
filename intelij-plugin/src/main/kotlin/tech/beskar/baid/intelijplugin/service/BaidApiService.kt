@@ -204,7 +204,7 @@ private fun readAndProcessStream(
                 val jsonResponse = JSONObject(result)
                 val sessionsArray = jsonResponse.getJSONArray("sessions")
                 val sessionPreviews = (0..<sessionsArray.length())
-                    .map { SessionPreview.fromJson(sessionsArray.getJSONObject(it)) }
+                    .map { SessionPreview.fromJson(sessionsArray.getJSONObject(it)) as SessionPreview? }
                     .toMutableList()
                 sessionPreviews
             },

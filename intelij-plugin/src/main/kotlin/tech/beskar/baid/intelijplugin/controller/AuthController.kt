@@ -66,12 +66,8 @@ class AuthController constructor( // Made constructor public
                 // currentUser.id is already UserId?
                 return CompletableFuture.completedFuture(currentUser!!.id)
             }
-            // Assuming authService.currentUserId still returns CompletableFuture<String?>
-            // This will need to be updated if/when AuthenticationService is refactored.
-            // For now, adapt the String? to UserId?
-            return authService.currentUserId.thenApply { idString ->
-                idString?.let { tech.beskar.baid.intelijplugin.model.common.UserId(it) }
-            }
+            // authService.currentUserId returns CompletableFuture<UserId?>
+            return authService.currentUserId
         }
 
     override fun validateAuthentication(onValid: Runnable, onInvalid: Runnable) { // Added override

@@ -16,9 +16,10 @@ interface ISessionController {
     )
 
     fun loadSessionPreviews(
-        onSuccess: Consumer<MutableList<SessionPreview>?>, // Consider List for immutability
+        onSuccess: Consumer<List<SessionPreview>?>, // Consider List for immutability
         onError: Consumer<Throwable?>
     )
+
 
     fun clearCurrentSession()
 }
