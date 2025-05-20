@@ -42,51 +42,72 @@ class InlineDiffDisplayManager(private val project: Project) {
     private val documentListeners = mutableMapOf<Editor, DocumentListener>() // Added
 
     private fun ensureMouseListener(editor: Editor) {
-        if (editorMouseListeners.containsKey(editor)) return
+        if (editorMouseListeners.containsKey(editor)) {
+            // logger.debug("Mouse listener already present for editor: ${editor.virtualFile?.name}") // Optional: for debugging registration
+            return
+        }
 
         val mouseListener = object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
-                // Ensure the event source is an Editor content component
-                val editorFromEvent = if (e.component is Editor) e.component as Editor else editor 
-                if (editorFromEvent != editor) { // Check if the event is from the editor we're interested in
-                    // This check might be redundant if the listener is added to editor.contentComponent
-                    // but good as a safeguard if added to editor itself.
-                    // For simplicity, we assume editor.addEditorMouseListener handles this.
+                // e.component is editor.contentComponent
+                logger.info("Mouse clicked on editor: ${editor.virtualFile?.name} at point: ${e.point}")
+
+                // Use the 'editor' instance captured by this lambda
+                val visualPosition = editor.xyToVisualPosition(e.point)
+                logger.debug("Calculated visual position: $visualPosition")
+
+                if (visualPosition.line >= editor.document.lineCount) {
+                    logger.warn("Click is outside document line range. Line: ${visualPosition.line}, Total Lines: ${editor.document.lineCount}")
+                    return
                 }
 
-                val visualPosition = editor.xyToVisualPosition(e.point)
                 val lineStartOffset = editor.document.getLineStartOffset(visualPosition.line)
                 val lineEndOffset = editor.document.getLineEndOffset(visualPosition.line)
                 
-                // Get block elements for the line. Consider only those that are DiffActionInlayRenderer.
                 val inlaysOnLine = editor.inlayModel.getBlockElementsInRange(lineStartOffset, lineEndOffset)
                     .filter { it.renderer is DiffActionInlayRenderer }
+                logger.debug("Found ${inlaysOnLine.size} relevant inlays on line ${visualPosition.line}.")
 
                 for (inlay in inlaysOnLine) {
-                    val inlayBounds = inlay.bounds ?: continue // Screen bounds
-                    val editorLocationOnScreen = editor.contentComponent.locationOnScreen
-                    
-                    // Convert click point to screen coordinates then to be relative to inlay's on-screen origin
-                    val clickPointOnScreen = RelativePoint(e.component, e.point).screenPoint
+                    logger.debug("Processing inlay: $inlay with renderer: ${inlay.renderer}")
+                    val inlayBounds = inlay.bounds // These are absolute screen coordinates
+                    if (inlayBounds == null) {
+                        logger.warn("Inlay bounds are null for $inlay. Skipping.")
+                        continue
+                    }
+                    logger.debug("Inlay screen bounds: $inlayBounds")
 
-                    // Check if the click is within the inlay's visual bounds on screen
+                    // editor.contentComponent.locationOnScreen gives the top-left of the content area on screen
+                    val editorLocationOnScreen = editor.contentComponent.locationOnScreen
+                    logger.debug("Editor contentComponent location on screen: $editorLocationOnScreen")
+
+                    // e.point is relative to editor.contentComponent. Convert to screen coordinates.
+                    val clickPointOnScreen = RelativePoint(e.component, e.point).screenPoint
+                    logger.debug("Click point on screen: $clickPointOnScreen")
+
                     if (inlayBounds.contains(clickPointOnScreen)) {
-                         val renderer = inlay.renderer as DiffActionInlayRenderer
-                        // Translate click to be relative to the inlay's own coordinate system (top-left of inlay)
+                        logger.info("Click IS within inlay bounds for $inlay.")
+                        val renderer = inlay.renderer as DiffActionInlayRenderer
+                        
                         val clickRelativeToInlayX = clickPointOnScreen.x - inlayBounds.x
                         val clickRelativeToInlayY = clickPointOnScreen.y - inlayBounds.y
+                        logger.debug("Click relative to inlay origin: X=$clickRelativeToInlayX, Y=$clickRelativeToInlayY")
                         
-                        // The handleClick in renderer is designed for coordinates relative to its own painting region.
-                        // The `inlayY` parameter in handleClick was simplified to 0.
-                        renderer.handleClick(editor, clickRelativeToInlayX, clickRelativeToInlayY, 0)
+                        // Call handleClick (which itself should log if accept/reject bounds are hit)
+                        renderer.handleClick(editor, clickRelativeToInlayX, clickRelativeToInlayY) // Removed the last '0' argument not present in definition
                         e.consume() 
+                        logger.debug("Event consumed for $inlay.")
                         return 
+                    } else {
+                        logger.debug("Click IS NOT within inlay bounds for $inlay.")
                     }
                 }
+                logger.debug("No inlay processed the click on line ${visualPosition.line}.")
             }
         }
         editor.contentComponent.addMouseListener(mouseListener)
         editorMouseListeners[editor] = mouseListener
+        logger.info("Added mouse listener for editor: ${editor.virtualFile?.name}")
     }
 
     private fun setupDocumentListener(editor: Editor) {
@@ -209,11 +230,13 @@ class InlineDiffDisplayManager(private val project: Project) {
                 }
             )
             
+            logger.debug("Processing hunk for inlay: type=${hunk.type}, oldStart=${hunk.oldStartLine}, oldEnd=${hunk.oldEndLine}, newStart=${hunk.newStartLine}, newEnd=${hunk.newEndLine}")
             val line = when (hunk.type) {
                 DiffHunkType.DELETE, DiffHunkType.CHANGE -> hunk.oldStartLine
-                DiffHunkType.ADD -> hunk.oldStartLine // Corrected: ADD inlay is positioned relative to old text structure
-                DiffHunkType.EQUAL -> -1
+                DiffHunkType.ADD -> hunk.oldStartLine // CRITICAL: Ensure this uses oldStartLine
+                DiffHunkType.EQUAL -> -1 // Should not typically have inlays
             }
+            logger.debug("Calculated inlay line for hunk type ${hunk.type}: $line (doc line count: ${document.lineCount})")
 
             if (line != -1 && line < document.lineCount) {
                 try {
