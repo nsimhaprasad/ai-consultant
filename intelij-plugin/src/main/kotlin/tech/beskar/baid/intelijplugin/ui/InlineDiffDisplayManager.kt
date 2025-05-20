@@ -210,8 +210,8 @@ class InlineDiffDisplayManager(private val project: Project) {
             )
             
             val line = when (hunk.type) {
-                DiffHunkType.DELETE, DiffHunkType.CHANGE -> hunk.oldStartLine 
-                DiffHunkType.ADD -> hunk.newStartLine 
+                DiffHunkType.DELETE, DiffHunkType.CHANGE -> hunk.oldStartLine
+                DiffHunkType.ADD -> hunk.oldStartLine // Corrected: ADD inlay is positioned relative to old text structure
                 DiffHunkType.EQUAL -> -1
             }
 
