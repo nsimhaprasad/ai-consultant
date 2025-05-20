@@ -7,9 +7,14 @@ import tech.beskar.baid.intelijplugin.model.Block
 import tech.beskar.baid.intelijplugin.model.FileContext
 import tech.beskar.baid.intelijplugin.model.Message
 import tech.beskar.baid.intelijplugin.service.BaidAPIService
-import tech.beskar.baid.intelijplugin.service.DiffService // Added import
+// Removed: import tech.beskar.baid.intelijplugin.service.DiffService
+import tech.beskar.baid.intelijplugin.service.InlineDiffService // Added
 import tech.beskar.baid.intelijplugin.service.StreamingResponseHandler
-import java.io.File // Added import
+import tech.beskar.baid.intelijplugin.ui.InlineDiffDisplayManager // Added
+import com.intellij.openapi.fileEditor.FileEditorManager // Added
+import com.intellij.openapi.fileEditor.FileDocumentManager // Added
+import com.intellij.openapi.editor.Editor // Added (ensure it's this one)
+// Removed: import java.io.File - no longer used directly here for diff
 import java.util.*
 import java.util.function.Consumer
 import java.util.function.Function
@@ -67,8 +72,10 @@ class ChatController private constructor() {
                 // Create a list to collect blocks for the final message
                 val responseBlocks: MutableList<Block> = ArrayList()
 
-                // Instantiate DiffService here, as project is available
-                val diffService = DiffService(project)
+                // Instantiate new services (or get them if they become properties/project services)
+                // No, project is not nullable here. It is project!! earlier.
+                val inlineDiffService = InlineDiffService() 
+                val inlineDiffDisplayManager = InlineDiffDisplayManager(project!!)
 
 
                 // Send the message to the API
@@ -81,34 +88,43 @@ class ChatController private constructor() {
                         // Process each block as it arrives
                         StreamingResponseHandler.processJsonBlock(
                             jsonBlock!!,
-                            { block: Block? -> // This is the onBlockReceived lambda we are modifying
+                            { block: Block? ->
                                 if (block is Block.Code && block.filename != null) {
-                                    // For Code blocks with a filename, show the diff
-                                    val file = File(project.basePath, block.filename) // Construct file path relative to project root
-                                    var oldContent = ""
-                                    if (file.exists()) {
-                                        oldContent = file.readText(Charsets.UTF_8)
+                                    val editor = FileEditorManager.getInstance(project)?.selectedTextEditor
+                                    if (editor != null) {
+                                        val currentFile = FileDocumentManager.getInstance().getFile(editor.document)
+                                        // More robust filename check:
+                                        // Consider block.filename could be relative or absolute.
+                                        // For now, using endsWith as a basic check.
+                                        // A truly robust check might involve resolving block.filename against project.basePath
+                                        // and comparing VirtualFile objects.
+                                        val targetFilename = block.filename.replace("\\", "/") // Normalize separators
+                                        val currentFilePath = currentFile?.path?.replace("\\", "/")
+
+                                        if (currentFile != null && currentFilePath != null && currentFilePath.endsWith(targetFilename, ignoreCase = true)) {
+                                            val documentText = editor.document.text
+                                            val newContent = block.content
+                                            
+                                            LOG.info("Showing inline diff for ${block.filename} in editor ${currentFile.path}")
+                                            inlineDiffDisplayManager.showInlineDiffs(editor, documentText, newContent, inlineDiffService)
+                                            
+                                            // NOTE: Block is NOT added to responseBlocks or passed to onBlockReceived.
+                                            // Interaction is handled by inline diff UI.
+                                        } else {
+                                            LOG.warn("Inline diff skipped: Editor not showing target file ${block.filename}. Current file: ${currentFile?.path}")
+                                            responseBlocks.add(block)
+                                            onBlockReceived.accept(block)
+                                        }
+                                    } else {
+                                        LOG.warn("Inline diff skipped: No suitable active editor for ${block.filename}.")
+                                        responseBlocks.add(block)
+                                        onBlockReceived.accept(block)
                                     }
-                                    
-                                    val onApplyAction = { appliedCodeBlock: tech.beskar.baid.intelijplugin.model.Block.Code ->
-                                        responseBlocks.add(appliedCodeBlock)
-                                        onBlockReceived.accept(appliedCodeBlock) // Call the original UI update callback
-                                    }
-                                    
-                                    // Ensure DiffService is available or instantiated (already done above)
-                                    diffService.showDiff(
-                                        block, // Pass the original Block.Code object
-                                        oldContent,
-                                        onApplyAction // Pass the callback
-                                    )
-                                    
-                                    // We will handle adding the block to responseBlocks after user accepts the diff.
-                                    // For now, we will not call onBlockReceived.accept(block) here to prevent duplicate display.
-                                    // The DiffDialog's "accept" action will eventually trigger adding the block or its modified version.
                                 } else {
-                                    // For other block types, or Code blocks without a filename, process as before
-                                    responseBlocks.add(block!!)
-                                    onBlockReceived.accept(block)
+                                    if (block != null) {
+                                        responseBlocks.add(block)
+                                    }
+                                    onBlockReceived.accept(block) // block can be null
                                 }
                             },
                             { updatedSessionId: String? ->
