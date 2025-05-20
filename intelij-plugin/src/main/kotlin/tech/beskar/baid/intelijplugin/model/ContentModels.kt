@@ -21,7 +21,8 @@ sealed class Block {
     data class Code(
         val language: String,
         val content: String,
-        val executable: Boolean
+        val executable: Boolean,
+        val filename: String? // New field
     ) : Block() {
 
         override fun toJson() = JSONObject().apply {
@@ -29,6 +30,7 @@ sealed class Block {
             put("language", language)
             put("content", content)
             put("executable", executable)
+            filename?.let { put("filename", it) } // Add filename if not null
         }
     }
 
