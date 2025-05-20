@@ -1,10 +1,12 @@
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, Field, EmailStr
 
 class ApiKeyBase(BaseModel):
     """Base model for API key operations."""
     name: str = Field(..., description="A friendly name for the API key")
+    tenant_id: Optional[UUID] = Field(None, description="ID of the tenant this API key belongs to")
 
 
 class ApiKeyCreate(ApiKeyBase):

@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from baid_server.api.middleware import TokenLimitMiddleware
 
-from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error, users
+from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error, users, tenant
 from baid_server.db.database import get_db_pool, close_db_pool
 from baid_server.services.service_factory import ServiceFactory
 
@@ -138,6 +138,7 @@ app.include_router(waitlist)
 app.include_router(api_key)
 app.include_router(auth_api_key)
 app.include_router(ci_error)
+app.include_router(tenant)
 app.include_router(users)
 
 # Mount static files directory

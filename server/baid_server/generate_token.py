@@ -3,7 +3,7 @@ payload = {
     "sub": "narasimha@beskar.tech",
     "name": "Narasimha CI",
     "admin": True,
-    "iat": 1715600000
+    "iat": 1847577798
 }
-token = jwt.encode(payload, "a-string-secret-at-least-256-bits-long", algorithm="HS256")
+token = jwt.encode(payload, "your-super-secret-key", algorithm="HS256")
 print(token)

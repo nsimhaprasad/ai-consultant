@@ -1,0 +1,41 @@
+### Variables
+# Run: poetry run python generate_token.py
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJuYXJhc2ltaGFAYmVza2FyLnRlY2giLCJuYW1lIjoiTmFyYXNpbWhhIENJIiwiYWRtaW4iOnRydWUsImlhdCI6MTg0NzU3Nzc5OH0.z3W36QSJnslpkcxXLLjB3Crfg_BF_EeMGFkIY_Q8yaI
+@tenant_id = db42abfe-c6f4-4ae0-98bf-1d4c7ee1960e
+
+### List all tenants
+GET {{host}}/api/tenants
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Create new tenant
+POST {{host}}/api/tenants
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Another Tenant",
+  "slug": "another-tenant"
+}
+
+### Get tenant by ID
+GET {{host}}/api/tenants/{{tenant_id}}
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Get users for tenant
+GET {{host}}/api/tenants/{{tenant_id}}/users
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Create API key for tenant
+POST {{host}}/api/tenants/{{tenant_id}}/api-keys
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Example API Key",
+  "expiry_days": 30
+}
