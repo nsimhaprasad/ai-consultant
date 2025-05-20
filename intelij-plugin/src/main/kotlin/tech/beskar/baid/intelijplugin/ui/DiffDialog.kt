@@ -1,10 +1,14 @@
 package tech.beskar.baid.intelijplugin.ui
 
-import com.intellij.openapi.diff.DiffManager
-import com.intellij.openapi.diff.DiffRequestFactory
+import com.intellij.diff.DiffContentFactory // Added import
+import com.intellij.diff.DiffManager
+import com.intellij.diff.requests.SimpleDiffRequest // Added import
+// Removed: import com.intellij.diff.DiffRequestFactory - no longer used
+import com.intellij.openapi.fileTypes.FileTypes // Added import
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
-import tech.beskar.baid.intelijplugin.model.Block // Added import
+import com.intellij.openapi.vfs.LocalFileSystem // Added import
+import tech.beskar.baid.intelijplugin.model.Block
 import tech.beskar.baid.intelijplugin.service.DiffService
 import java.awt.BorderLayout // Added import
 import javax.swing.JComponent
@@ -26,17 +30,33 @@ class DiffDialog(
     }
 
     override fun createCenterPanel(): JComponent? {
-        val diffRequest = DiffRequestFactory.getInstance().createSimpleDiffRequest(
-            project,
-            oldContent,
-            originalCodeBlock.content, // This is the new content
+        val contentFactory = DiffContentFactory.getInstance()
+
+        // Try to get VirtualFile for better content representation if filename is not null
+        var fileType = FileTypes.UNKNOWN // Use imported FileTypes
+        originalCodeBlock.filename?.let { fname ->
+            val file = java.io.File(project.basePath, fname) // Assuming filename is relative to project root
+            LocalFileSystem.getInstance().findFileByIoFile(file)?.let { virtualFile ->
+                fileType = virtualFile.fileType
+            }
+            // If you want to ensure the file is refreshed from disk:
+            // LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)?.let { virtualFile -> ... }
+        }
+
+        val currentDiffContent = contentFactory.create(project, oldContent, fileType)
+        val newDiffContent = contentFactory.create(project, originalCodeBlock.content, fileType)
+
+        val diffRequest = SimpleDiffRequest(
+            null, // Dialog title (already set on DialogWrapper)
+            currentDiffContent,
+            newDiffContent,
             "Current File Content",
             "Suggested Changes"
         )
 
         // `window` and `disposable` are available from DialogWrapper
-        val diffPanel = DiffManager.getInstance().createDiffPanel(window, project, disposable)
-        diffPanel.setDiffRequest(diffRequest)
+        val diffPanel = DiffManager.getInstance().createRequestPanel(project, disposable, window)
+        diffPanel.setRequest(diffRequest)
 
         val panel = JPanel(BorderLayout())
         panel.add(diffPanel.component, BorderLayout.CENTER)

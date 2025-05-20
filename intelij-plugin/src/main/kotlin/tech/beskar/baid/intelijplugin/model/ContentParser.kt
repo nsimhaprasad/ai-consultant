@@ -59,7 +59,7 @@ object ContentParser {
             val language = blockObj.getString("language")
             val content = blockObj.getString("content")
             val executable = blockObj.optBoolean("executable", false)
-            Block.Code(language, content, executable)
+            Block.Code(language, content, executable, blockObj.optString("filename", null))
         }
         "command" -> {
             val cmdType = CommandType.valueOf(blockObj.getString("commandType").uppercase())
