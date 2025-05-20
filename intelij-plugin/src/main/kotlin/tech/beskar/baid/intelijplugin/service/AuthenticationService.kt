@@ -80,9 +80,12 @@ class AuthenticationService private constructor() {
         }
     }
 
-    fun startSignIn(project: Project, onSuccess: Consumer<UserProfile?>) {
+    fun startSignIn(project: Project, onSuccess: Consumer<UserProfile?>, onError: Consumer<Throwable?>) {
         authService.startAuthFlow(project).thenAccept {
-            getUserProfile(onSuccess) {}
+            getUserProfile(onSuccess) { error -> onError.accept(error) }
+        }.exceptionally { error ->
+            onError.accept(error)
+            null
         }
     }
 

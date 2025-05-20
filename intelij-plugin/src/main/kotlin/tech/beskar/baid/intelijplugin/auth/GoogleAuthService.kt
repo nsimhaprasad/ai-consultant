@@ -112,7 +112,7 @@ class GoogleAuthService {
                         return@Thread
                     }
                 } catch (e: Exception) {
-                    // Ignore and retry
+                    LOG.error("Error polling for session", e)
                 }
                 Thread.sleep(pollInterval)
             }

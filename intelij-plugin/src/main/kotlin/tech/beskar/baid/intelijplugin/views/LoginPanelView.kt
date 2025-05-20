@@ -19,7 +19,7 @@ import javax.swing.SwingConstants
 import javax.swing.SwingUtilities
 
 
-class LoginPanelView(private val project: Project, private val onLoginCallback: Consumer<UserProfile?>) :
+class LoginPanelView(private val project: Project, private val onLoginCallback: Consumer<UserProfile?>, private val onLoginFailure: Consumer<Throwable>) :
     JBPanel<LoginPanelView>(BorderLayout()) {
     private val apiController: APIController = APIController.getInstance()
 
@@ -142,13 +142,17 @@ class LoginPanelView(private val project: Project, private val onLoginCallback: 
 
 
         // Start sign in
-        apiController.signIn(project) { userProfile: UserProfile? ->
+        apiController.signIn(project, { userProfile: UserProfile? ->
             // Success
             setSigningIn(false)
 
             // Notify callback
             onLoginCallback.accept(userProfile)
-        }
+        }, { error: Throwable? ->
+            // Error
+            setSigningIn(false)
+            error?.let { onLoginFailure.accept(it) }
+        })
     }
 
     private fun setSigningIn(isSigningIn: Boolean) {

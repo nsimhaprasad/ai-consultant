@@ -23,8 +23,8 @@ class APIController private constructor() {
         }
     }
 
-    fun signIn(project: Project, onSuccess: Consumer<UserProfile?>) {
-        authController.signIn(project, onSuccess)
+    fun signIn(project: Project, onSuccess: Consumer<UserProfile?>, onError: Consumer<Throwable?>) {
+        authController.signIn(project, onSuccess, onError)
     }
 
     fun signOut(onComplete: Runnable) {

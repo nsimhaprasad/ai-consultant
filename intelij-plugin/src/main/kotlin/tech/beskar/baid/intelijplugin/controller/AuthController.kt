@@ -37,11 +37,13 @@ class AuthController private constructor() {
         }, onError)
     }
 
-    fun signIn(project: Project, onSuccess: Consumer<UserProfile?>) {
-        authService.startSignIn(project) { profile: UserProfile? ->
+    fun signIn(project: Project, onSuccess: Consumer<UserProfile?>, onError: Consumer<Throwable?>) {
+        authService.startSignIn(project, { profile: UserProfile? ->
             currentUser = profile
             onSuccess.accept(profile)
-        }
+        }, { it: Throwable? ->
+            onError.accept(it)
+        })
     }
 
     fun signOut(onComplete: Runnable) {

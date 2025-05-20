@@ -1,7 +1,10 @@
 package tech.beskar.baid.intelijplugin
 import com.intellij.icons.AllIcons
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.impl.status.StatusBarUtil
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBTextField
@@ -41,7 +44,7 @@ class BaidToolWindowPanelMVC(private val project: Project) : JBPanel<BaidToolWin
     init {
 
         // Create panels
-        this.loginPanel = LoginPanelView(project) { userProfile: UserProfile? -> this.onLoginSuccess(userProfile!!) }
+        this.loginPanel = LoginPanelView(project, { userProfile: UserProfile? -> this.onLoginSuccess(userProfile!!) }, { e: Throwable? -> this.onLoginError(e!!) })
         this.mainPanel = JBPanel<JBPanel<*>?>(BorderLayout())
         this.chatPanel = ChatPanelView(project)
         this.pastConversationsView = PastConversationsView(project) { session: ChatSession? ->
@@ -408,6 +411,16 @@ class BaidToolWindowPanelMVC(private val project: Project) : JBPanel<BaidToolWin
         // Add welcome message
         chatPanel.clearChat()
         chatPanel.addMessage(Message("Welcome back, " + userProfile.name + "! How can I help you today?", isUser = false))
+    }
+
+    private fun onLoginError(error: Throwable) {
+        showLoginPanel()
+        updateUserProfileButton()
+        val message = error.cause.toString().substringAfter(":").ifBlank { "Something went wrong! Please try logging in again" }
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup("Baid Notifications")
+            .createNotification(message, NotificationType.ERROR)
+            .notify(project)
     }
 
     private fun onSessionSelected(session: ChatSession) {
