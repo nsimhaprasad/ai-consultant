@@ -3,7 +3,6 @@ package tech.beskar.baid.intelijplugin.ui
 import com.intellij.diff.DiffContentFactory // Added import
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest // Added import
-// Removed: import com.intellij.diff.DiffRequestFactory - no longer used
 import com.intellij.openapi.fileTypes.FileTypes // Added import
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper

@@ -121,11 +121,12 @@ class AgentService:
 
         # Extract context information
         file_content = context.get("file_content", "")
+        file_name = context.get("file_name", "")
         is_open = context.get("is_open", False)
 
         # Prepare message with format instructions
         if is_open:
-            message = f"{user_input}\n\nFile content: {file_content}" + "\n" + user_input
+            message = f"{user_input}\n\nFile content: {file_content}\n\n File name: {file_name}" + "\n" + user_input
         else:
             message = user_input
 
