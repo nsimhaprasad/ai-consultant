@@ -3,17 +3,20 @@ package tech.beskar.baid.intelijplugin.controller
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import tech.beskar.baid.intelijplugin.model.UserProfile
-import tech.beskar.baid.intelijplugin.service.AuthenticationService
+import tech.beskar.baid.intelijplugin.service.IAuthenticationService // Changed to interface
 import java.util.concurrent.CompletableFuture
 import java.util.function.Consumer
 
-class AuthController private constructor() {
-    private val authService: AuthenticationService = AuthenticationService.getInstance()
+class AuthController constructor( // Made constructor public
+    private val authService: IAuthenticationService // Changed to interface and added to constructor
+    // Project parameter removed for now as it's only used to pass to authService.startSignIn,
+    // which will get it from its direct caller.
+) : IAuthController { // Implement interface
 
-    var currentUser: UserProfile? = null
+    override var currentUser: UserProfile? = null // Added override
         private set
 
-    fun checkAuthenticationStatus(onComplete: Consumer<Boolean?>) {
+    override fun checkAuthenticationStatus(onComplete: Consumer<Boolean?>) { // Added override
         authService.isAuthenticated { authenticated: Boolean? ->
             if (authenticated == true && currentUser == null) {
                 // If authenticated but user profile not loaded, load it
@@ -30,14 +33,14 @@ class AuthController private constructor() {
         }
     }
 
-    fun loadUserProfile(onSuccess: Consumer<UserProfile?>, onError: Consumer<Throwable?>) {
+    override fun loadUserProfile(onSuccess: Consumer<UserProfile?>, onError: Consumer<Throwable?>) { // Added override
         authService.getUserProfile({ profile: UserProfile? ->
             currentUser = profile
             onSuccess.accept(profile)
         }, onError)
     }
 
-    fun signIn(project: Project, onSuccess: Consumer<UserProfile?>, onError: Consumer<Throwable?>) {
+    override fun signIn(project: Project, onSuccess: Consumer<UserProfile?>, onError: Consumer<Throwable?>) { // Added override
         authService.startSignIn(project, { profile: UserProfile? ->
             currentUser = profile
             onSuccess.accept(profile)
@@ -46,25 +49,32 @@ class AuthController private constructor() {
         })
     }
 
-    fun signOut(onComplete: Runnable) {
+    override fun signOut(onComplete: Runnable) { // Added override
         authService.signOut {
             currentUser = null
             onComplete.run()
         }
     }
 
-    val accessToken: CompletableFuture<String?>
+    override val accessToken: CompletableFuture<String?> // Added override
         get() = authService.currentAccessToken
 
-    val userId: CompletableFuture<String?>
+    // Changed return type to CompletableFuture<UserId?>
+    override val userId: CompletableFuture<tech.beskar.baid.intelijplugin.model.common.UserId?> // Added override
         get() {
-            if (currentUser != null) {
-                return CompletableFuture.completedFuture<String?>(currentUser!!.id)
+            if (currentUser != null && currentUser!!.id != null) {
+                // currentUser.id is already UserId?
+                return CompletableFuture.completedFuture(currentUser!!.id)
             }
-            return authService.currentUserId
+            // Assuming authService.currentUserId still returns CompletableFuture<String?>
+            // This will need to be updated if/when AuthenticationService is refactored.
+            // For now, adapt the String? to UserId?
+            return authService.currentUserId.thenApply { idString ->
+                idString?.let { tech.beskar.baid.intelijplugin.model.common.UserId(it) }
+            }
         }
 
-    fun validateAuthentication(onValid: Runnable, onInvalid: Runnable) {
+    override fun validateAuthentication(onValid: Runnable, onInvalid: Runnable) { // Added override
         authService.isAuthenticated { authenticated: Boolean? ->
             if (authenticated == true) {
                 // Also check if token is expired
@@ -77,22 +87,8 @@ class AuthController private constructor() {
         }
     }
 
-    companion object {
+    companion object { // Companion object can be removed if getInstance is gone
         private val LOG = Logger.getInstance(AuthController::class.java)
-
-        @get:Synchronized
-        var _instance: AuthController? = null
-            get() {
-                if (field == null) {
-                    field = AuthController()
-                }
-                return field
-            }
-        fun getInstance(): AuthController {
-            if (_instance == null) {
-                _instance = AuthController()
-            }
-            return _instance!!
-        }
+        // Removed getInstance and _instance
     }
 }

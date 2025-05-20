@@ -1,24 +1,29 @@
 package tech.beskar.baid.intelijplugin.model
 
 import org.json.JSONObject
+import tech.beskar.baid.intelijplugin.model.common.MessageId
 import java.text.SimpleDateFormat
 import java.util.*
 
+// Added id field and updated constructors
 class Message {
     // Getters
+    val id: MessageId // Added ID field
     val content: String
     val isUser: Boolean
     val timestamp: Date?
     val role: String?
 
-    constructor(content: String, isUser: Boolean) {
+    constructor(content: String, isUser: Boolean, id: MessageId = MessageId(UUID.randomUUID().toString())) {
+        this.id = id
         this.content = content
         this.isUser = isUser
         this.timestamp = Date()
         this.role = if (isUser) "user" else "assistant"
     }
 
-    constructor(content: String, role: String?, timestamp: Date?) {
+    constructor(content: String, role: String?, timestamp: Date?, id: MessageId = MessageId(UUID.randomUUID().toString())) {
+        this.id = id
         this.content = content
         this.role = role
         this.isUser = "user" == role
@@ -44,11 +49,13 @@ class Message {
     }
 
     override fun toString(): String {
-        return "Message(content=$content, isUser=$isUser, timestamp=$timestamp, role=$role)"
+        return "Message(id=$id, content=$content, isUser=$isUser, timestamp=$timestamp, role=$role)" // Added id to toString
     }
 
     companion object {
         fun fromJson(messageJson: JSONObject): Message {
+            val idValue = messageJson.optString("id", UUID.randomUUID().toString()) // Get ID or generate
+            val messageId = MessageId(idValue)
             val content = messageJson.getString("message")
             val role = messageJson.getString("role")
 
@@ -57,14 +64,15 @@ class Message {
             try {
                 if (messageJson.has("timestamp")) {
                     val timestampStr = messageJson.getString("timestamp")
-                    val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                    val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss") // Consider making format a const or static
                     timestamp = format.parse(timestampStr)
                 }
             } catch (e: Exception) {
+                // Log error appropriately
                 println("Error parsing timestamp: ${e.message}")
             }
 
-            return Message(content, role, timestamp)
+            return Message(content, role, timestamp, messageId) // Pass messageId to constructor
         }
     }
 }

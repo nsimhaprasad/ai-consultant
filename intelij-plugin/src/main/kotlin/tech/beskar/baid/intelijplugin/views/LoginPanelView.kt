@@ -5,7 +5,7 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.util.ui.JBUI
-import tech.beskar.baid.intelijplugin.controller.APIController
+import tech.beskar.baid.intelijplugin.controller.IAuthController // Changed to interface
 import tech.beskar.baid.intelijplugin.model.UserProfile
 import java.awt.BorderLayout
 import java.awt.FlowLayout
@@ -19,9 +19,13 @@ import javax.swing.SwingConstants
 import javax.swing.SwingUtilities
 
 
-class LoginPanelView(private val project: Project, private val onLoginCallback: Consumer<UserProfile?>, private val onLoginFailure: Consumer<Throwable>) :
-    JBPanel<LoginPanelView>(BorderLayout()) {
-    private val apiController: APIController = APIController.getInstance()
+class LoginPanelView(
+    private val project: Project,
+    private val authController: IAuthController, // Injected dependency
+    private val onLoginCallback: Consumer<UserProfile?>,
+    private val onLoginFailure: Consumer<Throwable>
+) : JBPanel<LoginPanelView>(BorderLayout()) {
+    // Removed: private val apiController: APIController = APIController.getInstance()
 
     private var signInButton: JButton? = null
     private var statusLabel: JBLabel? = null
@@ -140,9 +144,8 @@ class LoginPanelView(private val project: Project, private val onLoginCallback: 
         // Show loading state
         setSigningIn(true)
 
-
-        // Start sign in
-        apiController.signIn(project, { userProfile: UserProfile? ->
+        // Start sign in using the injected authController
+        authController.signIn(project, { userProfile: UserProfile? ->
             // Success
             setSigningIn(false)
 

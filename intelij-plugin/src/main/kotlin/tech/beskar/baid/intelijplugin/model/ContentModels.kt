@@ -91,9 +91,24 @@ sealed class Block {
         is Callout -> toJson()
     }
     
+import tech.beskar.baid.intelijplugin.service.exceptions.ApiException // Added import
+import java.util.concurrent.CancellationException // Added import
+
     companion object {
         fun toJsonArray(blocks: List<Block>): JSONArray = JSONArray().apply {
             blocks.forEach { put(it.toJson()) }
+        }
+
+        fun fromError(error: Throwable): Paragraph {
+            // Consider more sophisticated error message extraction if needed
+            val errorMessage = when (error) {
+                is ApiException -> "API Error: ${error.message} (Status: ${error.statusCode})"
+                is CancellationException -> "Operation cancelled."
+                // It's good practice to handle cause for generic Exceptions if available
+                else -> error.cause?.message ?: error.message ?: "An unexpected error occurred."
+            }
+            // You might want to add more details or structure to the error block
+            return Paragraph("Error: $errorMessage")
         }
     }
 }

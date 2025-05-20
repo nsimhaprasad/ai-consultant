@@ -38,7 +38,7 @@ class ChatPanelView(private val project: Project?) :
 
     private val messagesPanel: JBPanel<JBPanel<*>> = JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(8)))
     private val scrollPane: JBScrollPane
-    private val apiController: APIController = APIController.getInstance()
+    // Removed: private val apiController: APIController = APIController.getInstance()
 
     // Track message bubbles by ID for updating
     private val bubbles: MutableMap<String?, MessageBubblePanel> = ConcurrentHashMap<String?, MessageBubblePanel>()
@@ -207,36 +207,7 @@ class ChatPanelView(private val project: Project?) :
         }
     }
 
-    fun sendMessage(
-        content: String,
-        onComplete: () -> Unit = {},
-        onError: (Throwable) -> Unit = {}
-    ) {
-        // Create and add user message
-        val userMessage = Message(content, true)
-        addMessage(userMessage)
-
-        // Start streaming response
-        startStreamingResponse()
-
-        // Send to backend
-        apiController.sendMessage(
-            project,
-            content,
-            { message: Message? -> },
-            { block: Block? -> this.addStreamingBlock(block) },
-            {
-                endStreamingResponse()
-                onComplete()
-            },
-            { error: Throwable? ->
-                val errorBlock = apiController.createErrorBlock(error!!)
-                addStreamingBlock(errorBlock)
-                endStreamingResponse()
-                onError(error)
-            }
-        )
-    }
+    // Removed sendMessage method
 
     fun clearChat() {
         SwingUtilities.invokeLater {

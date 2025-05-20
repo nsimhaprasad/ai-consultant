@@ -6,13 +6,17 @@ import tech.beskar.baid.intelijplugin.model.*
 import tech.beskar.baid.intelijplugin.service.StreamingResponseHandler
 import java.util.function.Consumer
 
-
-class APIController private constructor() {
-    private val authController: AuthController = AuthController.getInstance()
-    private val chatController: ChatController = ChatController.getInstance()
-    private val sessionController: SessionController = SessionController.getInstance()
+// Constructor updated with all dependencies
+class APIController constructor(
+    private val authController: IAuthController,
+    private val sessionController: ISessionController,
+    private val chatController: IChatController // Added, though its direct uses are being removed
+    // Removed baidApiService from constructor as it's used by underlying controllers
+    // Project is also removed as it's passed directly to methods that need it (like signIn)
+) {
 
     fun initialize(project: Project?, onAuthenticated: Consumer<UserProfile?>, onNotAuthenticated: Runnable) {
+        // Project is passed to authController.signIn if needed, not stored here.
         authController.checkAuthenticationStatus { authenticated: Boolean? ->
             if (authenticated == true) {
                 val profile = authController.currentUser
@@ -23,75 +27,45 @@ class APIController private constructor() {
         }
     }
 
+    // Retained for now, but could be called directly on IAuthController by consumers
     fun signIn(project: Project, onSuccess: Consumer<UserProfile?>, onError: Consumer<Throwable?>) {
         authController.signIn(project, onSuccess, onError)
     }
 
     fun signOut(onComplete: Runnable) {
         authController.signOut {
-            // Also clear session data
+            // Session and chat clearing should ideally be handled by observers or higher-level coordination
+            // For now, keep it here as per existing logic, but acknowledge it's not purely SRP for Auth.
             sessionController.clearCurrentSession()
-            chatController.clearConversation()
+            chatController.clearConversation() // Use the injected chatController
             onComplete.run()
         }
     }
 
-    fun loadConversation(sessionId: String?, onSuccess: Consumer<ChatSession?>, onError: Consumer<Throwable?>) {
-        sessionController.loadSession(sessionId, { session: ChatSession? ->
-            chatController.setCurrentMessages(session!!.getMessages())
-            onSuccess.accept(session)
-        }, onError)
+    // Delegating to SessionController
+    fun loadConversation(sessionId: tech.beskar.baid.intelijplugin.model.common.SessionId?, onSuccess: Consumer<ChatSession?>, onError: Consumer<Throwable?>) {
+        // The original also called chatController.setCurrentMessages. This responsibility should move.
+        // For now, SessionController.loadConversationDetails is expected to just fetch.
+        // The calling context (e.g., BaidToolWindowController) will handle updating the chat.
+        sessionController.loadConversationDetails(sessionId, onSuccess, onError)
     }
 
-    fun loadPastConversations(onSuccess: Consumer<MutableList<SessionPreview>?>, onError: Consumer<Throwable?>) {
-        sessionController.loadSessionPreviews(onSuccess, onError)
+    // Delegating to SessionController
+    fun loadPastConversations(onSuccess: Consumer<List<SessionPreview?>>, onError: Consumer<Throwable?>) {
+        // Changed Consumer type to List as SessionController.fetchUserSessionPreviews might return immutable
+        sessionController.fetchUserSessionPreviews(onSuccess, onError)
     }
 
-    fun sendMessage(
-        project: Project?,
-        content: String,
-        onMessageSent: Consumer<Message?>,
-        onBlockReceived: Consumer<Block?>,
-        onComplete: Runnable?,
-        onError: Consumer<Throwable?>
-    ) {
-        chatController.sendMessage(
-            project,
-            content,
-            onMessageSent,
-            onBlockReceived,
-            onComplete,
-            onError
-        )
-    }
+    // Removed sendMessage(...)
+    // Removed clearCurrentSession()
 
     val currentUser: UserProfile?
         get() = authController.currentUser
 
-    fun createErrorBlock(error: Throwable): Block {
-        return StreamingResponseHandler.createErrorBlock(error)
-    }
-
-    fun clearCurrentSession() {
-        sessionController.clearCurrentSession()
-    }
+    // Removed createErrorBlock(error: Throwable): Block
 
     companion object {
         private val LOG = Logger.getInstance(APIController::class.java)
-
-        @get:Synchronized
-        var _instance: APIController? = null
-            get() {
-                if (field == null) {
-                    field = APIController()
-                }
-                return field
-            }
-        fun getInstance(): APIController {
-            if(_instance == null) {
-                _instance = APIController()
-            }
-            return _instance!!
-        }
+        // getInstance() and _instance removed
     }
 }

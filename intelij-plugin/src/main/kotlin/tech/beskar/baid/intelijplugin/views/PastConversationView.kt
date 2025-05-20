@@ -8,9 +8,9 @@ import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.ui.JBUI
-import tech.beskar.baid.intelijplugin.controller.APIController
-import tech.beskar.baid.intelijplugin.model.ChatSession
+import tech.beskar.baid.intelijplugin.controller.ISessionController // Changed to interface
 import tech.beskar.baid.intelijplugin.model.SessionPreview
+// Removed unused ChatSession import
 import java.awt.BorderLayout
 import java.awt.Cursor
 import java.awt.Font
@@ -23,9 +23,11 @@ import javax.swing.border.Border
 import javax.swing.border.CompoundBorder
 
 
-class PastConversationsView(private val project: Project?, private val onSessionSelected: Consumer<ChatSession?>) :
-    JBPanel<PastConversationsView>(BorderLayout()) {
-    private val apiController: APIController = APIController.getInstance()
+class PastConversationsView(
+    private val project: Project?, // Project might not be needed if all actions are through controller
+    private val sessionController: ISessionController, // Changed from APIController to ISessionController
+    private val onSessionSelected: Consumer<SessionPreview?>
+) : JBPanel<PastConversationsView>(BorderLayout()) {
 
     private var conversationsPanel: JBPanel<JBPanel<*>?>? = null
     private var statusLabel: JBLabel? = null
@@ -110,18 +112,23 @@ class PastConversationsView(private val project: Project?, private val onSession
 
 
         // Load conversations
-        apiController.loadPastConversations(
-            { sessions: MutableList<SessionPreview>? -> this.displayConversations(sessions) },
+        // APIController.loadPastConversations returned MutableList<SessionPreview>?
+        // ISessionController.fetchUserSessionPreviews returns List<SessionPreview?>
+        sessionController.fetchUserSessionPreviews(
+            { sessions: List<SessionPreview?>? -> // Adjusted type
+                // Ensure displayConversations can handle List<SessionPreview?>
+                this.displayConversations(sessions?.filterNotNull()?.toMutableList()) // Adapt to existing displayConversations
+            },
             { error: Throwable? -> this.handleLoadError(error!!) }
         )
     }
 
-    private fun displayConversations(sessions: MutableList<SessionPreview>?) {
+    private fun displayConversations(sessions: MutableList<SessionPreview>?) { // Existing signature
         SwingUtilities.invokeLater {
             // Clear panel
             conversationsPanel!!.removeAll()
 
-            if (sessions.isNullOrEmpty()) {
+            if (sessions.isNullOrEmpty()) { // sessions is already MutableList<SessionPreview> here or null
                 // Show empty state
                 statusLabel = JBLabel("No past conversations found", SwingConstants.CENTER)
                 statusLabel!!.setForeground(JBColor.foreground().darker())
@@ -180,7 +187,8 @@ class PastConversationsView(private val project: Project?, private val onSession
         // Add click handler
         panel.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent?) {
-                loadSession(session.sessionId)
+                // Directly call the onSessionSelected callback with the SessionPreview object
+                onSessionSelected.accept(session)
             }
 
             override fun mouseEntered(e: MouseEvent?) {
@@ -216,26 +224,7 @@ class PastConversationsView(private val project: Project?, private val onSession
         }
     }
 
-    private fun loadSession(sessionId: String?) {
-        // Show loading state
-        SwingUtilities.invokeLater {
-            conversationsPanel!!.removeAll()
-            statusLabel = JBLabel("Loading conversation...", SwingConstants.CENTER)
-            statusLabel!!.setForeground(JBColor.foreground().darker())
-            statusLabel!!.setBorder(JBUI.Borders.empty(JBUI.scale(24)))
-            conversationsPanel!!.add(statusLabel)
-            conversationsPanel!!.revalidate()
-            conversationsPanel!!.repaint()
-        }
-
-
-        // Load session
-        apiController.loadConversation(
-            sessionId,
-            { session: ChatSession? ->
-                onSessionSelected?.accept(session)
-            },
-            { error: Throwable? -> this.handleLoadError(error!!) }
-        )
-    }
+    // Removed loadSession(sessionId: SessionId?) method
+    // The responsibility to load full session details is now with BaidToolWindowController
+    // when it receives the SessionPreview.
 }
