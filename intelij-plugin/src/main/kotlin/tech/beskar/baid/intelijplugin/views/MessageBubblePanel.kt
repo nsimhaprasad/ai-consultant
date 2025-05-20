@@ -20,7 +20,9 @@ import tech.beskar.baid.intelijplugin.ui.ContentRenderer.renderCommand
 import tech.beskar.baid.intelijplugin.ui.ContentRenderer.renderHeading
 import tech.beskar.baid.intelijplugin.ui.ContentRenderer.renderParagraph
 import tech.beskar.baid.intelijplugin.ui.MessageFormatter
+import tech.beskar.baid.intelijplugin.ui.RoundedBorder
 import tech.beskar.baid.intelijplugin.util.createAvatarLabel
+import javax.swing.BorderFactory
 import java.awt.*
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
@@ -73,7 +75,11 @@ class MessageBubblePanel(
         // Create message bubble container with VerticalLayout for better content expansion
         bubbleContainer = JBPanel<JBPanel<*>?>(VerticalLayout(JBUI.scale(8)))
         bubbleContainer!!.setBackground(JBColor.GREEN.darker())
-        bubbleContainer!!.setBorder(JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12)))
+        bubbleContainer!!.isOpaque = false
+        bubbleContainer!!.setBorder(BorderFactory.createCompoundBorder(
+            RoundedBorder(JBColor.GREEN.darker(), 12),
+            JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
+        ))
 
         // Create message text pane
         textPane = createTextPane()
@@ -110,7 +116,7 @@ class MessageBubblePanel(
             htmlContent = result.first
         } else {
             htmlContent = "<html><body style='width: " + messageWidth + "px; max-width: " + messageWidth +
-                    "px;'>" + content.replace("\n", "<br>") + "</body></html>"
+                    "px; word-wrap: break-word; overflow-wrap: break-word;'>" + content.replace("\n", "<br>") + "</body></html>"
         }
 
         textPane?.text = htmlContent
@@ -160,7 +166,11 @@ class MessageBubblePanel(
         // Create message bubble container with VerticalLayout for better content expansion
         bubbleContainer = JBPanel<JBPanel<*>?>(VerticalLayout(JBUI.scale(8)))
         bubbleContainer!!.setBackground(JBColor.gray)
-        bubbleContainer!!.setBorder(JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12)))
+        bubbleContainer!!.isOpaque = false
+        bubbleContainer!!.setBorder(BorderFactory.createCompoundBorder(
+            RoundedBorder(JBColor.gray, 12),
+            JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
+        ))
 
         // Create message text pane
         textPane = createTextPane()
@@ -242,7 +252,11 @@ class MessageBubblePanel(
             // Create message bubble container with vertical layout for blocks
             bubbleContainer = JBPanel<JBPanel<*>?>(VerticalLayout(JBUI.scale(8)))
             bubbleContainer!!.setBackground(JBColor.gray)
-            bubbleContainer!!.setBorder(JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12)))
+            bubbleContainer!!.isOpaque = false
+            bubbleContainer!!.setBorder(BorderFactory.createCompoundBorder(
+                RoundedBorder(JBColor.gray, 12),
+                JBUI.Borders.empty(JBUI.scale(8), JBUI.scale(12))
+            ))
 
             // Create content panel with avatar and bubble
             val contentPanel = JBPanel<JBPanel<*>?>(BorderLayout())
