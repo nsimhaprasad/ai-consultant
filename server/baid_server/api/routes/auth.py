@@ -6,23 +6,16 @@ from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse
 from starlette.responses import JSONResponse
 
-from baid_server.db.database import get_db_pool
-from baid_server.db.repositories.user_repository import UserRepository
+# Removed direct imports of UserRepository, OAuthConfig, JWTConfig, and their providers,
+# as get_auth_service is now imported from services.dependencies
 from baid_server.services.auth_service import AuthService
+from baid_server.services.dependencies import get_auth_service # MODIFIED: Import centralized provider
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 
-async def get_user_repository() -> UserRepository:
-    return UserRepository(
-        db_pool= await get_db_pool()
-    )
-
-
-def get_auth_service(user_repository: UserRepository = Depends(get_user_repository)) -> AuthService:
-    return AuthService(user_repository=user_repository)
-
+# Removed local definition of get_auth_service. It's now imported.
 
 @router.get("/google-login")
 async def google_login_redirect(

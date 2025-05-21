@@ -11,15 +11,8 @@ logger = logging.getLogger(__name__)
 class UserRepository:
     """Repository for user-related database operations."""
 
-    def __init__(self, db_pool: Optional[asyncpg.Pool] = None):
+    def __init__(self, db_pool: asyncpg.Pool):
         self._db_pool = db_pool
-
-    async def _get_pool(self):
-        """Get the database pool."""
-        from baid_server.db.database import get_db_pool
-        if not self._db_pool:
-            self._db_pool = await get_db_pool()
-        return self._db_pool
 
     async def store_user(self, userinfo: Dict[str, Any], tenant_id: Optional[UUID] = None):
         """Store a user in the database."""
@@ -27,16 +20,16 @@ class UserRepository:
         name = userinfo.get("name")
         picture = userinfo.get("picture")
 
+        pool = self._db_pool # Use self._db_pool directly
+
         # If no tenant_id is provided, use the default tenant
         if tenant_id is None:
-            pool = await self._get_pool()
-            async with pool.acquire() as conn:
+            async with pool.acquire() as conn: # Use acquired connection from self._db_pool
                 tenant_id = await conn.fetchval('''
                 SELECT id FROM tenants WHERE slug = 'default'
                 ''')
 
-        pool = await self._get_pool()
-        async with pool.acquire() as conn:
+        async with pool.acquire() as conn: # Use acquired connection from self._db_pool
             try:
                 await conn.execute('''
                 INSERT INTO users (email, name, picture, tenant_id)
@@ -50,41 +43,117 @@ class UserRepository:
                 logger.error(f"Error storing user: {str(e)}")
                 raise
 
-    async def add_to_waitlist(
-            self,
-            email: str,
-            name: Optional[str],
-            role: Optional[str],
-            referral_source: Optional[str],
-            ip_address: str
-    ):
-        """Add a user to the waitlist."""
-        pool = await self._get_pool()
-        async with pool.acquire() as conn:
-            try:
-                await conn.execute('''
-                INSERT INTO waitlist (email, name, role, referral_source, ip_address)
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (email) DO NOTHING
-                ''', email, name, role, referral_source, ip_address)
+    # add_to_waitlist method removed from UserRepository
 
-                logger.info(f"Added to waitlist: {email}")
-            except Exception as e:
-                logger.error(f"Error adding to waitlist: {str(e)}")
-                raise
+    async def update_user_status(self, user_id: str, status: str) -> bool:
+        """Insert or update a user's status."""
+        pool = self._db_pool
+        async with pool.acquire() as conn:
+            # Check if user exists
+            user_exists = await conn.fetchval("SELECT 1 FROM users WHERE email = $1", user_id)
+            if not user_exists:
+                logger.warning(f"User {user_id} not found for status update.")
+                return False
+            
+            await conn.execute(
+                """
+                INSERT INTO user_status (user_id, status, updated_at)
+                VALUES ($1, $2, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    status = $2,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                user_id, status
+            )
+            logger.info(f"Updated status for user {user_id} to {status}")
+            return True
+
+    async def get_user_status(self, user_id: str) -> Optional[str]:
+        """Get a user's status."""
+        pool = self._db_pool
+        async with pool.acquire() as conn:
+            status = await conn.fetchval("SELECT status FROM user_status WHERE user_id = $1", user_id)
+            return status
+
+    async def update_user_token_limit(self, user_id: str, token_limit: int) -> bool:
+        """Insert or update a user's token limit."""
+        pool = self._db_pool
+        async with pool.acquire() as conn:
+            user_exists = await conn.fetchval("SELECT 1 FROM users WHERE email = $1", user_id)
+            if not user_exists:
+                logger.warning(f"User {user_id} not found for token limit update.")
+                return False
+
+            await conn.execute(
+                """
+                INSERT INTO user_settings (user_id, setting_key, setting_value, updated_at)
+                VALUES ($1, 'token_limit', $2, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id, setting_key) DO UPDATE SET
+                    setting_value = $2,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                user_id, str(token_limit)
+            )
+            logger.info(f"Updated token limit for user {user_id} to {token_limit}")
+            return True
+
+    async def get_user_token_limit(self, user_id: str) -> Optional[int]:
+        """Get a user's token limit."""
+        pool = self._db_pool
+        async with pool.acquire() as conn:
+            limit_str = await conn.fetchval(
+                "SELECT setting_value FROM user_settings WHERE user_id = $1 AND setting_key = 'token_limit'",
+                user_id
+            )
+            if limit_str:
+                try:
+                    return int(limit_str)
+                except ValueError:
+                    logger.error(f"Invalid token limit value '{limit_str}' for user {user_id}.")
+                    return None
+            return None
+            
+    async def get_dashboard_users_data(self) -> List[Dict[str, Any]]:
+        """Fetch comprehensive data for the users dashboard."""
+        pool = self._db_pool
+        async with pool.acquire() as conn:
+            # This query is complex and aggregates data from multiple tables.
+            # It's a simplified version of the original dashboard logic.
+            # Token count estimation logic (estimate_tokens) would be in the service layer or a utility.
+            rows = await conn.fetch("""
+                SELECT 
+                    u.id, 
+                    u.email, 
+                    u.name, 
+                    u.picture, 
+                    u.created_at,
+                    COUNT(m.id) as message_count,
+                    MAX(m.timestamp) as last_active,
+                    us.status as user_status,
+                    COALESCE(uset.setting_value, gs.setting_value) as token_limit_value
+                FROM users u
+                LEFT JOIN messages m ON u.email = m.user_id
+                LEFT JOIN user_status us ON u.email = us.user_id
+                LEFT JOIN user_settings uset ON u.email = uset.user_id AND uset.setting_key = 'token_limit'
+                LEFT JOIN global_settings gs ON gs.setting_key = 'default_token_limit'
+                GROUP BY u.id, u.email, u.name, u.picture, u.created_at, us.status, uset.setting_value, gs.setting_value
+                ORDER BY u.created_at DESC
+            """)
+            # Further processing (like token estimation, relative time) will be done in the service layer.
+            return [dict(row) for row in rows]
 
     async def store_api_key(self, user_id: str, api_key: str, name: str, tenant_id: Optional[UUID] = None, expires_at=None):
         """Store a new API key for a user."""
+        pool = self._db_pool # Use self._db_pool directly
+
         # If no tenant_id is provided, get the user's tenant
         if tenant_id is None:
-            pool = await self._get_pool()
-            async with pool.acquire() as conn:
+            async with pool.acquire() as conn: # Use acquired connection from self._db_pool
                 tenant_id = await conn.fetchval('''
                 SELECT tenant_id FROM users WHERE email = $1
                 ''', user_id)
 
-        pool = await self._get_pool()
-        async with pool.acquire() as conn:
+        async with pool.acquire() as conn: # Use acquired connection from self._db_pool
             try:
                 result = await conn.fetchval('''
                 INSERT INTO api_keys (user_id, api_key, name, tenant_id, expires_at)
@@ -114,7 +183,7 @@ class UserRepository:
             
         query += " ORDER BY created_at DESC"
         
-        pool = await self._get_pool()
+        pool = self._db_pool
         async with pool.acquire() as conn:
             rows = await conn.fetch(query, *params)
 
@@ -142,13 +211,13 @@ class UserRepository:
             query += " AND tenant_id = $3"
             params.append(str(tenant_id))
             
-        pool = await self._get_pool()
+        pool = self._db_pool
         async with pool.acquire() as conn:
             await conn.execute(query, *params)
 
     async def validate_api_key(self, api_key: str):
         """Validate an API key and return user info if valid."""
-        pool = await self._get_pool()
+        pool = self._db_pool
         async with pool.acquire() as conn:
             # Find the API key and join with users table to get user info
             row = await conn.fetchrow('''
@@ -173,7 +242,7 @@ class UserRepository:
         
     async def get_users_by_tenant(self, tenant_id: UUID) -> List[Dict[str, Any]]:
         """Get all users belonging to a specific tenant."""
-        pool = await self._get_pool()
+        pool = self._db_pool
         async with pool.acquire() as conn:
             rows = await conn.fetch('''
             SELECT email, name, picture, created_at

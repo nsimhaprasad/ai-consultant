@@ -13,43 +13,22 @@ from vertexai.agent_engines import AgentEngine
 
 from baid_server.core.parser.agent_response import parse_ci_response
 from baid_server.utils.ci_response_parser import CiResponseParser
+from baid_server.config import CIErrorServiceConfigModel # Added import
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class CIErrorServiceConfig:
-    """Configuration for CI Error Service."""
-    project_id: str = os.getenv("PROJECT_ID", "")
-    location: str = os.getenv("LOCATION", "us-central1")
-    agent_engine_id: str = os.getenv("AGENT_ENGINE_ID", "")
-
-    @property
-    def agent_engine_id_only(self) -> str:
-        """Get just the ID portion of the agent engine ID."""
-        return self.agent_engine_id.split('/')[-1] if self.agent_engine_id else ""
-
-    @property
-    def reasoning_engine_app_name(self) -> str:
-        """Get the reasoning engine app name."""
-        if not self.agent_engine_id_only:
-            raise ValueError(
-                "AGENT_ENGINE_ID is not set or is invalid. "
-                "Please set the AGENT_ENGINE_ID environment variable."
-            )
-        return self.agent_engine_id_only
-
+# Removed CIErrorServiceConfig dataclass, will use CIErrorServiceConfigModel from config.py
 
 class CIErrorService:
 
     def __init__(
         self,
-        config: Optional[CIErrorServiceConfig] = None,
+        config: CIErrorServiceConfigModel, # Modified: Use CIErrorServiceConfigModel, now required
+        execution_client: ReasoningEngineExecutionServiceClient, # Added: Now required
     ):
-        self.config = config or CIErrorServiceConfig()
-        api_endpoint = f"{self.config.location}-aiplatform.googleapis.com"
-        self.execution_client = ReasoningEngineExecutionServiceClient(
-            client_options={"api_endpoint": api_endpoint}
-        )
+        self.config = config # Modified: Use injected config
+        self.execution_client = execution_client # Modified: Use injected client
+        # Internal instantiation of execution_client is removed.
 
     def get_agent(self) -> AgentEngine:
         logger.debug("Getting ReasoningEngine instance")

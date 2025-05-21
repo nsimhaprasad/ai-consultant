@@ -11,17 +11,14 @@ logger = logging.getLogger(__name__)
 
 class MessageRepository:
 
-    def __init__(self, db_pool: Optional[asyncpg.Pool] = None):
+    def __init__(self, db_pool: asyncpg.Pool): # Modified: db_pool is now required
         self._db_pool = db_pool
     
-    async def _get_pool(self) -> asyncpg.Pool:
-        if self._db_pool is None:
-            return await get_db_pool()
-        return self._db_pool
+    # Removed _get_pool method
 
     async def store_message(self, user_id: str, session_id: str, role: str, content: str) -> None:
         logger.debug(f"Storing message: user_id={user_id}, session_id={session_id}, role={role}")
-        pool = await self._get_pool()
+        pool = self._db_pool # Modified: Use self._db_pool directly
         async with pool.acquire() as conn:
             try:
                 await conn.execute('''
@@ -35,7 +32,7 @@ class MessageRepository:
 
 
     async def get_session_history(self, user_id: str, session_id: str) -> List[Dict[str, Any]]:
-        pool = await self._get_pool()
+        pool = self._db_pool # Modified: Use self._db_pool directly
         async with pool.acquire() as conn:
             rows = await conn.fetch('''
             SELECT role, content, timestamp 

@@ -67,7 +67,12 @@ async def get_db_pool() -> asyncpg.Pool:
         except Exception as e:
             logger.error(f"Failed to create database connection pool: {str(e)}")
             raise
-    return db_pool
+    try:
+        yield db_pool
+    finally:
+        # Pool closure is typically handled at application shutdown,
+        # see main.py lifespan manager.
+        pass
 
 
 async def close_db_pool():
