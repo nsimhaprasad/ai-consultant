@@ -1,33 +1,30 @@
-import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-
-import dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+# Set environment
+from baid_server.config import set_environment_from_args
+set_environment_from_args()
+
+# Configure logging
+from baid_server.utils.logging import configure_logging, get_logger, CORSMiddlewareLogging
+configure_logging()
+logger = get_logger()
+
+# Configure settings
+from baid_server.config import settings
+settings.print_variables()
+
+from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error, tenant
 from baid_server.api.middleware import TokenLimitMiddleware
 
 from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error, users, tenant
 from baid_server.db.database import get_db_pool, close_db_pool
 from baid_server.services.service_factory import ServiceFactory
-
-# Load environment variables
-dotenv.load_dotenv()
-
-# Enhanced logging configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("adk_server")
-
 
 # Create FastAPI application
 @asynccontextmanager
@@ -53,15 +50,18 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="BAID Server",
-    description="AI Consultant API",
-    version="1.0.0",
-    lifespan=lifespan
+    title = settings.APP_NAME,
+    description = settings.DESCRIPTION,
+    version = settings.APP_VERSION,
+    lifespan = lifespan
 )
 
 # Enable word-by-word streaming logging
 ENABLE_WORD_BY_WORD_STREAMING = os.getenv("ENABLE_WORD_BY_WORD_STREAMING", "true").lower() == "true"
 logger.info(f"Word-by-word streaming: {'ENABLED' if ENABLE_WORD_BY_WORD_STREAMING else 'DISABLED'}")
+
+# Add CORS logging middleware
+app.add_middleware(CORSMiddlewareLogging)
 
 # CORS middleware for the application
 app.add_middleware(

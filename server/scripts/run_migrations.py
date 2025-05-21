@@ -11,32 +11,31 @@ import time
 import asyncio
 import asyncpg
 from pathlib import Path
+from baid_server.config import settings
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-)
-logger = logging.getLogger("db_migrations")
+from baid_server.utils.logging import configure_logging, get_logger
+configure_logging()
+logger = get_logger("db_migrations")
 
 # Get database connection details from environment variables
-DB_HOST = os.environ.get("DB_HOST", "localhost")
-DB_PORT = os.environ.get("DB_PORT", "5432")
-DB_NAME = os.environ.get("DB_NAME", "ai_consultant_db")
-DB_USER = os.environ.get("DB_USER", "admin")
-DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
+DB_HOST = settings.DB_HOST
+DB_PORT = settings.DB_PORT
+DB_NAME = settings.DB_NAME
+DB_USER = settings.DB_USER
+DB_PASSWORD = settings.DB_PASSWORD
 
 # For production, we'll use the secret manager
-DB_CONNECTION_SECRET = os.environ.get("DB_CONNECTION_SECRET", "")
-PROJECT_ID = os.environ.get("PROJECT_ID", "")
+DB_CONNECTION_SECRET = settings.DB_CONNECTION_SECRET
+PROJECT_ID = settings.PROJECT_ID
 
 # Maximum number of retries for database connection
 MAX_RETRIES = 10
 RETRY_DELAY = 5  # seconds
 
 # Path to migration files
-MIGRATIONS_DIR = Path("/app/migrations")
-
+MIGRATIONS_DIR = Path(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "migrations"))
+if os.getenv("ENVIRONMENT", "local") != "local":
+    MIGRATIONS_DIR = Path("/app/migrations")
 
 async def get_connection_string():
     """Get database connection string from environment or Secret Manager."""

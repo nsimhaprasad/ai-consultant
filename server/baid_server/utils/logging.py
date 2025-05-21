@@ -50,3 +50,30 @@ def get_logger(name: Optional[str] = None) -> Any:
         Logger instance.
     """
     return structlog.get_logger(name)
+
+
+def get_logger(name: str = "baid_server"):
+    """Get a configured logger instance."""
+    return logging.getLogger(name)
+
+
+# --- CORS logging middleware ---
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+class CORSMiddlewareLogging(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        origin = request.headers.get("origin")
+        if origin:
+            logger = get_logger()
+            logger.info(f"CORS request from origin: {origin} path: {request.url.path}")
+        return response
+
+# Usage:
+# In main.py, after app creation:
+# from baid_server.utils.logging import configure_logging, get_logger, CORSMiddlewareLogging
+# configure_logging()
+# logger = get_logger()
+# app.add_middleware(CORSMiddlewareLogging)

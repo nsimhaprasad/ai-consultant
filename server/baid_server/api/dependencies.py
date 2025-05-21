@@ -6,8 +6,10 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt
 
+from baid_server.config import settings
+
 # JWT configuration
-JWT_SECRET = os.environ.get("JWT_SECRET", "")
+JWT_SECRET = os.environ.get("JWT_SECRET", settings.JWT_SECRET)
 JWT_ALGORITHM = "HS256"
 
 logger = logging.getLogger(__name__)
