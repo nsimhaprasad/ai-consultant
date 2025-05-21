@@ -6,24 +6,26 @@ import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.model.Block
 import tech.beskar.baid.intelijplugin.model.FileContext
 import tech.beskar.baid.intelijplugin.model.Message
-import tech.beskar.baid.intelijplugin.service.BaidAPIService
+import tech.beskar.baid.intelijplugin.service.IBaidApiService // Changed to interface
 import tech.beskar.baid.intelijplugin.service.StreamingResponseHandler
 import java.util.*
 import java.util.function.Consumer
 import java.util.function.Function
 import javax.swing.SwingUtilities
 
-class ChatController private constructor() {
-    private val apiService: BaidAPIService = BaidAPIService.getInstance()
-    private val authController: AuthController = AuthController.getInstance()
-    private val sessionController: SessionController = SessionController.getInstance()
+class ChatController constructor( // Made constructor public
+    private val project: Project?, // Added project to constructor (already used)
+    private val apiService: IBaidApiService, // Changed to interface and added to constructor
+    private val authController: IAuthController, // Changed to interface and added to constructor
+    private val sessionController: ISessionController // Changed to interface and added to constructor
+) : IChatController { // Implement interface
 
     private val currentMessages: MutableList<Message?> = ArrayList()
 
-    var isProcessingMessage: Boolean = false
+    override var isProcessingMessage: Boolean = false // Added override
         private set
 
-    fun sendMessage(
+    override fun sendMessage( // Added override
         project: Project?,
         content: String,
         onMessageSent: Consumer<Message?>,
@@ -38,114 +40,94 @@ class ChatController private constructor() {
 
         isProcessingMessage = true
 
-
-        // Create and add user message
         val userMessage = Message(content, true)
         currentMessages.add(userMessage)
         onMessageSent.accept(userMessage)
 
-
-        // Validate authentication before proceeding
-        authController.validateAuthentication({
-            // Get required tokens and session info
-            authController.accessToken.thenAccept(Consumer { accessToken: String? ->
-                if (accessToken == null) {
-                    isProcessingMessage = false
-                    onError.accept(IllegalStateException("Authentication failed"))
-                    return@Consumer
-                }
-                // Get file context
-                val fileContext = FileContext.fromCurrentEditor(project!!)
-
-
-                // Get current session ID
-                val sessionId: String? = sessionController.currentSessionId
-
-
-                // Create a list to collect blocks for the final message
-                val responseBlocks: MutableList<Block> = ArrayList()
-
-
-                // Send the message to the API
-                apiService.sendMessage(
-                    content,
-                    fileContext,
-                    accessToken,
-                    sessionId,
-                    { jsonBlock: JSONObject? ->
-                        // Process each block as it arrives
-                        StreamingResponseHandler.processJsonBlock(
-                            jsonBlock!!,
-                            { block: Block? ->
-                                responseBlocks.add(block!!)
-                                onBlockReceived.accept(block)
-                            },
-                            { updatedSessionId: String? ->
-                                sessionController.currentSessionId = updatedSessionId
-                            }
-                        )
-                    },
-                    { updatedSessionId: String? ->
-                        // Create and add AI message with all blocks
-                        if (responseBlocks.isNotEmpty()) {
-                            // Convert blocks to JSON and create a message
-                            val messageContent = JSONObject().apply {
-                                put("blocks", Block.toJsonArray(responseBlocks))
-                            }
-                            val aiMessage = Message(messageContent.toString(), false)
-                            currentMessages.add(aiMessage)
-                        }
-
-                        isProcessingMessage = false
-                        sessionController.currentSessionId = updatedSessionId
-                        SwingUtilities.invokeLater(onComplete)
-                    },
-                    { error: Throwable? ->
-                        isProcessingMessage = false
-                        SwingUtilities.invokeLater { onError.accept(error) }
+        authController.validateAuthentication(
+            onValid = {
+                authController.accessToken.thenAccept { accessToken ->
+                    if (accessToken == null) {
+                        handleAuthFailure(onError, "Authentication failed: Access token is null.")
+                        return@thenAccept
                     }
-                )
-            }).exceptionally(Function { error: Throwable? ->
+                    proceedWithSendMessage(project, content, accessToken, onBlockReceived, onComplete, onError)
+                }.exceptionally { error ->
+                    handleAuthFailure(onError, "Failed to retrieve access token: ${error.message}", error)
+                    null // Required by exceptionally block
+                }
+            },
+            onInvalid = { handleAuthFailure(onError, "Authentication failed: Validation returned invalid.") }
+        )
+    }
+
+    private fun proceedWithSendMessage(
+        project: Project?,
+        content: String,
+        accessToken: String,
+        onBlockReceived: Consumer<Block?>,
+        onComplete: Runnable?,
+        onError: Consumer<Throwable?>
+    ) {
+        val fileContext = FileContext.fromCurrentEditor(project ?: error("Project context is required for sending messages."))
+        val sessionId = sessionController.currentSessionId
+        val responseBlocks = mutableListOf<Block>()
+
+        apiService.sendMessage(
+            content,
+            fileContext,
+            accessToken,
+            sessionId,
+            { jsonBlock -> // Assuming jsonBlock is JSONObject? from IBaidApiService
+                jsonBlock?.let { // Ensure jsonBlock is not null before processing
+                    StreamingResponseHandler.processJsonBlock(
+                        it, // Now non-null
+                        { block -> // Assuming block is Block?
+                            block?.let { b -> responseBlocks.add(b) } // Add if not null
+                            onBlockReceived.accept(block) // Pass original block (nullable)
+                        },
+                        { updatedSessionIdString ->
+                            sessionController.currentSessionId = updatedSessionIdString?.let { tech.beskar.baid.intelijplugin.model.common.SessionId(it) }
+                        }
+                    )
+                }
+            },
+            { updatedSessionIdString ->
+                if (responseBlocks.isNotEmpty()) {
+                    val messageContent = JSONObject().apply { put("blocks", Block.toJsonArray(responseBlocks)) }
+                    currentMessages.add(Message(messageContent.toString(), false))
+                }
+                isProcessingMessage = false
+                sessionController.currentSessionId = updatedSessionIdString
+                SwingUtilities.invokeLater(onComplete)
+            },
+            { error ->
                 isProcessingMessage = false
                 SwingUtilities.invokeLater { onError.accept(error) }
-                null
-            })
-        }, {
-            // Authentication invalid
-            isProcessingMessage = false
-            onError.accept(IllegalStateException("Authentication failed"))
-        })
+            }
+        )
     }
 
-    fun clearConversation() {
+    private fun handleAuthFailure(onError: Consumer<Throwable?>, message: String, cause: Throwable? = null) {
+        isProcessingMessage = false
+        val exception = IllegalStateException(message, cause)
+        SwingUtilities.invokeLater { onError.accept(exception) }
+    }
+
+    override fun clearConversation() {
         currentMessages.clear()
     }
 
-    fun getCurrentMessages(): MutableList<Message?> {
-        return ArrayList<Message?>(currentMessages)
+    override fun getCurrentMessages(): MutableList<Message?> {
+        return ArrayList(currentMessages) // Return a copy
     }
 
-    fun setCurrentMessages(messages: MutableList<Message?>) {
+    override fun setCurrentMessages(messages: MutableList<Message?>) {
         currentMessages.clear()
-        currentMessages.addAll(messages)
+        currentMessages.addAll(messages.filterNotNull()) // Filter out null messages if any
     }
 
     companion object {
         private val LOG = Logger.getInstance(ChatController::class.java)
-
-        @get:Synchronized
-        var _instance: ChatController? = null
-            get() {
-                if (field == null) {
-                    field = ChatController()
-                }
-                return field
-            }
-        fun getInstance(): ChatController {
-            if (_instance == null) {
-                _instance = ChatController()
-            }
-            return _instance!!
-        }
     }
 }

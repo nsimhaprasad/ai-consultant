@@ -1,6 +1,8 @@
 package tech.beskar.baid.intelijplugin.model
 
 import com.intellij.openapi.application.ApplicationManager
+import tech.beskar.baid.intelijplugin.model.common.Email // Added import
+import tech.beskar.baid.intelijplugin.model.common.UserId
 import com.intellij.util.ui.UIUtil
 import org.json.JSONObject
 import java.awt.Image
@@ -17,7 +19,7 @@ import javax.swing.SwingUtilities
 
 class UserProfile
 (
-    val id: String?, val name: String?, val email: String?, val picture: String?
+    val id: UserId?, val name: String?, val email: Email?, val picture: String? // Changed email to Email?
 ) {
     private var profileImage: ImageIcon? = null
     private var imageLoaded = false
@@ -105,12 +107,15 @@ class UserProfile
 
     companion object {
         fun fromJson(userJson: JSONObject): UserProfile {
-            val id = userJson.optString("id", userJson.optString("sub", ""))
+            val idValue = userJson.optString("id", userJson.optString("sub", null)) // Get "id" or "sub", default to null if neither
+            val userId = idValue?.let { UserId(it) } // Create UserId if idValue is not null
+
             val name = userJson.optString("name", "")
-            val email = userJson.optString("email", "")
+            val emailString = userJson.optString("email", null) // Get email as string, default to null
+            val emailObject = emailString?.takeIf { it.isNotBlank() }?.let { Email(it) } // Create Email?
             val picture = userJson.optString("picture", null)
 
-            return UserProfile(id, name, email, picture)
+            return UserProfile(userId, name, emailObject, picture) // Use emailObject
         }
     }
 }

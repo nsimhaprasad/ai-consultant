@@ -8,8 +8,6 @@ import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
@@ -18,6 +16,7 @@ import com.intellij.util.io.HttpRequests
 import com.intellij.util.ui.JBUI
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.config.BaidConfiguration
+import tech.beskar.baid.intelijplugin.model.common.Email // Added import
 import tech.beskar.baid.intelijplugin.util.FontUtil
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -30,20 +29,15 @@ import java.util.concurrent.CompletableFuture
 import javax.swing.JButton
 import javax.swing.SwingUtilities
 
-@Service
+@Service // Keep @Service for now, but getInstance is removed
 class GoogleAuthService {
-    companion object {
-        private val LOG = Logger.getInstance(GoogleAuthService::class.java)
+    // Companion object and getInstance removed
 
-        // Instance for service access
-        fun getInstance(): GoogleAuthService = service()
-    }
-
-    private val config = BaidConfiguration.getInstance()
+    private val config = BaidConfiguration.getInstance() // This might be injected later if BaidConfiguration is refactored
     private var userInfo: UserInfo? = null
 
     data class UserInfo(
-        val email: String,
+        val email: Email?, // Changed to Email?
         val name: String,
         val picture: String?
     )
@@ -95,8 +89,11 @@ class GoogleAuthService {
                         return@Thread
                     }
                     if (json.has("access_token")) {
+                        val emailString = json.optString("email", null)
+                        val emailObject = emailString?.takeIf { it.isNotBlank() }?.let { Email(it) }
+
                         val user = UserInfo(
-                            email = json.getString("email"),
+                            email = emailObject,
                             name = json.getString("name"),
                             picture = if (json.has("picture")) json.getString("picture") else null
                         )
@@ -112,7 +109,7 @@ class GoogleAuthService {
                         return@Thread
                     }
                 } catch (e: Exception) {
-                    LOG.error("Error polling for session", e)
+                    println("Error polling for session ${e.message}")
                 }
                 Thread.sleep(pollInterval)
             }
@@ -177,6 +174,17 @@ class GoogleAuthService {
     fun signOut() {
         clearTokens()
         userInfo = null
+    }
+
+    companion object {
+        private var instance: GoogleAuthService? = null
+
+        fun getInstance(project: Project? = null): GoogleAuthService {
+            return instance ?: synchronized(this) {
+                instance ?: (project?.let { GoogleAuthService() } ?: instance)
+                    ?: throw IllegalStateException("GoogleAuthService must be initialized with a project first")
+            }
+        }
     }
 
     // Clear all saved tokens
@@ -288,7 +296,8 @@ class UserProfilePanel(
             }
 
             // User email
-            val emailLabel = JBLabel(userInfo.email).apply {
+            // User email - use .value for display, provide a default if null
+            val emailLabel = JBLabel(userInfo.email?.value ?: "No email").apply {
                 font = FontUtil.getBodyFont()
             }
 
