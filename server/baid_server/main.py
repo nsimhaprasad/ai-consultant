@@ -60,6 +60,7 @@ app = FastAPI(
 ENABLE_WORD_BY_WORD_STREAMING = os.getenv("ENABLE_WORD_BY_WORD_STREAMING", "true").lower() == "true"
 logger.info(f"Word-by-word streaming: {'ENABLED' if ENABLE_WORD_BY_WORD_STREAMING else 'DISABLED'}")
 
+## Middlewares ##
 # Add CORS logging middleware
 app.add_middleware(CORSMiddlewareLogging)
 
