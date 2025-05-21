@@ -56,10 +56,6 @@ app = FastAPI(
     lifespan = lifespan
 )
 
-# Enable word-by-word streaming logging
-ENABLE_WORD_BY_WORD_STREAMING = os.getenv("ENABLE_WORD_BY_WORD_STREAMING", "true").lower() == "true"
-logger.info(f"Word-by-word streaming: {'ENABLED' if ENABLE_WORD_BY_WORD_STREAMING else 'DISABLED'}")
-
 ## Middlewares ##
 # Add CORS logging middleware
 app.add_middleware(CORSMiddlewareLogging)
@@ -84,7 +80,6 @@ async def read_root():
     return {
         "message": "Server is running",
         "agent_engine_id": os.getenv("AGENT_ENGINE_ID", ""),
-        "word_by_word_streaming": os.getenv("ENABLE_WORD_BY_WORD_STREAMING", "true").lower() == "true",
         "database": "PostgreSQL"
     }
 
