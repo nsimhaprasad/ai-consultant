@@ -7,92 +7,27 @@ import traceback
 from typing import Dict, Tuple, Optional, List
 from pydantic import BaseModel
 import requests
+from rich.console import Console
+from rich.markdown import Markdown
+import io
 
 from .spinner import Spinner
 
-# ANSI color codes for terminal formatting
-COLORS = {
-    'RESET': '\033[0m',
-    'BOLD': '\033[1m',
-    'ITALIC': '\033[3m',
-    'UNDERLINE': '\033[4m',
-    'BLACK': '\033[30m',
-    'RED': '\033[31m',
-    'GREEN': '\033[32m',
-    'YELLOW': '\033[33m',
-    'BLUE': '\033[34m',
-    'MAGENTA': '\033[35m',
-    'CYAN': '\033[36m',
-    'WHITE': '\033[37m',
-    'BRIGHT_BLACK': '\033[90m',  # Gray
-    'BRIGHT_RED': '\033[91m',
-    'BRIGHT_GREEN': '\033[92m',
-    'BRIGHT_YELLOW': '\033[93m',
-    'BRIGHT_BLUE': '\033[94m',
-    'BRIGHT_MAGENTA': '\033[95m',
-    'BRIGHT_CYAN': '\033[96m',
-    'BRIGHT_WHITE': '\033[97m',
-}
-
 
 def format_markdown_for_terminal(text: str) -> str:
-    """Format markdown text for terminal display with ANSI colors
-    
-    Handles common markdown elements like headers, lists, code blocks,
-    bold and italic text, and inline code.
-    """
+    """Format markdown text for terminal display using rich"""
     if not text:
         return ""
     
-    # Process code blocks with or without language specification
-    def replace_code_block(match):
-        if match.group(1):
-            language = match.group(1).strip()
-            code = match.group(2).strip()
-        else:
-            language = ""
-            code = match.group(2).strip()
-        
-        formatted_code = []
-        for line in code.split('\n'):
-            formatted_code.append(f"  {COLORS['BRIGHT_BLACK']}{line}{COLORS['RESET']}")
-            
-        return f"\n{COLORS['BOLD']}Code{' (' + language + ')' if language else ''}:{COLORS['RESET']}\n{'\n'.join(formatted_code)}\n"
+    # Create a console that captures output
+    console = Console(color_system="truecolor", width=80, file=io.StringIO())
     
-    # First handle code blocks (must be done before inline elements)
-    text = re.sub(r'```([\w]*)[\s\n]*(.*?)```', replace_code_block, text, flags=re.DOTALL)
+    # Render the markdown
+    md = Markdown(text)
+    console.print(md, end="")
     
-    # Handle inline code
-    text = re.sub(r'`([^`]+)`', f"{COLORS['BRIGHT_BLACK']}\1{COLORS['RESET']}", text)
-    
-    # Handle headers
-    text = re.sub(r'^(#{1,6})\s+(.+)$', 
-                 lambda m: f"\n{COLORS['BOLD']}{COLORS['BRIGHT_WHITE']}{' ' * (len(m.group(1))-1)}{'#' if len(m.group(1)) <= 3 else '-'} {m.group(2)}{COLORS['RESET']}", 
-                 text, 
-                 flags=re.MULTILINE)
-    
-    # Handle bold text
-    text = re.sub(r'\*\*(.+?)\*\*', f"{COLORS['BOLD']}\1{COLORS['RESET']}", text)
-    
-    # Handle italic text
-    text = re.sub(r'\*([^\*]+)\*', f"{COLORS['ITALIC']}\1{COLORS['RESET']}", text)
-    
-    # Handle unordered lists
-    text = re.sub(r'^(\s*)[-*]\s+(.+)$', 
-                 lambda m: f"{m.group(1)}• {COLORS['BRIGHT_WHITE']}\2{COLORS['RESET']}", 
-                 text, 
-                 flags=re.MULTILINE)
-    
-    # Handle ordered lists
-    text = re.sub(r'^(\s*)(\d+)\.\s+(.+)$', 
-                 lambda m: f"{m.group(1)}{COLORS['BRIGHT_YELLOW']}{m.group(2)}.{COLORS['RESET']} {COLORS['BRIGHT_WHITE']}\3{COLORS['RESET']}", 
-                 text, 
-                 flags=re.MULTILINE)
-    
-    # Add extra spacing for readability
-    text = re.sub(r'\n{3,}', '\n\n', text)  # Normalize multiple blank lines
-    
-    return text
+    # Get the rendered output
+    return console.file.getvalue()
 
 # Constants
 CI_ANALYZE_URL = os.environ.get("BAID_CI_ANALYZE_URL", "https://core.baid.dev/api/ci/analyze")
@@ -162,7 +97,14 @@ def process_streaming_response(response) -> Dict:
                 continue
                 
             # Extract data portion
-            data = line[6:].strip()  # Skip "data: " prefix
+            data = line[6:].strip()
+            if data.startswith("{\"error\":"):
+                try:
+                    error = json.loads(data)    
+                    result["error"] = error["error"]
+                except json.JSONDecodeError as e:
+                    result["error"] = data
+                return result
             
             # Check for end of stream
             if data == "[DONE]":
@@ -175,7 +117,6 @@ def process_streaming_response(response) -> Dict:
             # Continue reading lines until we have a complete JSON object
             while brace_count > 0 and i < len(lines):
                 next_line = lines[i].strip()
-                print(f"[STREAM] continuation: {next_line}")
                 json_builder.append(next_line)
                 brace_count += next_line.count('{') - next_line.count('}')
                 i += 1
@@ -276,6 +217,10 @@ def run_ci_analysis(command, stdout, stderr, config):
 
 def print_analysis(analysis: Dict) -> None:
     """Print a concise version of the analysis results to stdout"""
+    if "error" in analysis:
+        print(f"Some error occurred while analyzing the error. Please try again.\n{analysis['error']}")
+        return
+
     print("\n" + "=" * 80)
     print("🔍 BAID-CI ERROR ANALYSIS")
     print("=" * 80)

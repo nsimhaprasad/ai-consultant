@@ -9,7 +9,7 @@ from baid_server.core.models import CiAnalyzerResponse
 logger = logging.getLogger(__name__)
 class CiResponseParser:
     @staticmethod
-    async def process_incoming_chunk(event) -> Optional[str]:
+    async def process_incoming_chunk(event) -> AsyncGenerator[str, Any]:
         try:
             # Extract blocks from the cleaned JSON
             blocks = CiResponseParser.extract_blocks(CiAnalyzerResponse(**event))
@@ -19,7 +19,6 @@ class CiResponseParser:
                     formatted_block = CiResponseParser.format_block_for_sse(block, include_sse_format=True)
                     if formatted_block:
                         # Stream each block individually
-                        print("Formatted block:", formatted_block)
                         yield formatted_block
         except Exception as e:
             logger.debug(f"Error processing chunk: {str(e)}")

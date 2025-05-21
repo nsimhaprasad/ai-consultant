@@ -1,19 +1,13 @@
 import logging
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from fastapi.responses import StreamingResponse
 from baid_server.api.dependencies import get_current_user
 from baid_server.models.ci_error import CIErrorRequest
-from baid_server.core.parser.agent_response import parse_ci_response
 from baid_server.prompts.format import CI_RESPONSE_FORMAT
-from baid_server.utils.ci_response_parser import CiResponseParser
-
-# --- Vertex AI ADK imports ---
-from vertexai import agent_engines
-from google.cloud.aiplatform_v1.services.reasoning_engine_execution_service import ReasoningEngineExecutionServiceClient
-from google.cloud.aiplatform_v1 import types
+from baid_server.services.service_factory import ServiceFactory
 
 router = APIRouter(tags=["ci"])
 logger = logging.getLogger(__name__)
@@ -23,7 +17,8 @@ AGENT_RESOURCE_NAME = "projects/742371152853/locations/us-central1/reasoningEngi
 @router.post("/api/ci/analyze")
 async def analyze_ci_error(
         request: CIErrorRequest,
-        current_user: Dict[str, Any] = Depends(get_current_user)
+        current_user: Dict[str, Any] = Depends(get_current_user),
+        session_id: Optional[str] = Header(None, alias="session_id")
 ):
     request_id = os.urandom(4).hex()
     logger.info(f"[{request_id}] === Starting CI error analysis request ===")
@@ -60,67 +55,29 @@ Make sure your response is in the following JSON format:
 Stream your response as a series of rfc8259 JSON format only. Do not include any other characters or formatting. Each chunk should be a valid JSON object.
 """
     try:
-        # Get the agent engine
-        agent = agent_engines.get(AGENT_RESOURCE_NAME)
-        # Create a session for this user/request
-        session = agent.create_session(user_id=user_id)
-        session_id = session["id"]
-        logger.info(f"[{request_id}] Created agent session: {session_id}")
-        # Prepare the message
-        message = prompt
-        # Prepare the stream query request
-        stream_request = types.StreamQueryReasoningEngineRequest(
-            name=AGENT_RESOURCE_NAME,
-            input={
-                "message": message,
-                "user_id": user_id,
-                "session_id": session_id,
-            }
+        # Get the CI Error Service
+        ci_error_service = await ServiceFactory.initialize_ci_error_service()
+        
+        # Create a streaming response using the CI Error Service
+        response_stream = ci_error_service.analyze_error(
+            prompt=prompt,
+            user_id=user_id,
+            session_id=session_id,
+            request_id=request_id
         )
-        api_endpoint = f"{os.getenv('LOCATION', 'us-central1')}-aiplatform.googleapis.com"
-        execution_client = ReasoningEngineExecutionServiceClient(client_options={"api_endpoint": api_endpoint})
-        stream_response = execution_client.stream_query_reasoning_engine(stream_request)
-
-        stream_response = await log_complete_response_from_agent(request_id, stream_response)
-
-        import functools
-        import asyncio
-        import json
-        async def ci_stream():
-            full_response = ""
-            logger.info(f"[{request_id}] Streaming agent response...")
-            for idx, event in enumerate(parse_ci_response(stream_response)):
-                logger.info(f"[{request_id}] Streaming event #{idx}: Raw event: {repr(event)}")
-                full_response += str(event)
-                # Detect and surface agent errors
-                try:
-                    # Try to extract error from JSON event
-                    if isinstance(event, str):
-                        event_data = json.loads(event)
-                    else:
-                        event_data = event
-                    if isinstance(event_data, dict) and event_data.get("error_code") and event_data.get("error_message"):
-                        error_msg = f"Agent Error ({event_data['error_code']}): {event_data['error_message']}"
-                        logger.error(f"[{request_id}] Agent returned error: {error_msg}")
-                        yield f"data: {{\"error\": \"{error_msg}\"}}\n\n"
-                        continue
-                except Exception as parse_exc:
-                    logger.warning(f"[{request_id}] Could not parse event for error: {parse_exc}")
-                # Process chunks as they come in - iterate through the async generator
-                async for sse_data in CiResponseParser.process_incoming_chunk(event):
-                    logger.info(f"[{request_id}] Processed SSE data: {repr(sse_data)}")
-                    if sse_data:
-                        yield sse_data
-                        await asyncio.sleep(1)
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(ci_stream(), media_type="text/event-stream")
+        
+        # Return the streaming response
+        return StreamingResponse(response_stream, media_type="text/event-stream")
+        
     except Exception as e:
         logger.error(f"[{request_id}] Error in CI error analysis: {str(e)}", exc_info=True)
         error_msg = str(e)
+        
         async def error_stream():
-            print("error_msg: ", error_msg)
+            logger.error(f"[{request_id}] Error stream: {error_msg}")
             yield f"data: {{\"solution\": \"Internal server error\", \"explanation\": \"{error_msg}\"}}\n\n"
             yield "data: [DONE]\n\n"
+            
         return StreamingResponse(error_stream(), media_type="text/event-stream")
 
 
