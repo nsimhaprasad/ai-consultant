@@ -93,7 +93,7 @@ class CIErrorService:
             )
 
             # Initialize retry mechanism
-            max_retries = 1
+            max_retries = 3
             retry_count = 0
             success = False
 
