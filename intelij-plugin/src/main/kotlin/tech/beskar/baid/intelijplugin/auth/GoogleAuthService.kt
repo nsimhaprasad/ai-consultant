@@ -2,7 +2,6 @@ package tech.beskar.baid.intelijplugin.auth
 
 import com.intellij.credentialStore.CredentialAttributes
 import com.intellij.credentialStore.Credentials
-import com.intellij.credentialStore.generateServiceName
 import com.intellij.ide.BrowserUtil
 import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.openapi.application.ApplicationManager
@@ -29,6 +28,9 @@ import java.util.*
 import java.util.concurrent.CompletableFuture
 import javax.swing.JButton
 import javax.swing.SwingUtilities
+
+private const val BAID_BACKEND_TOKEN = "BaidBackendToken"
+private const val BAID_BACKEND_TOKEN_EXPIRY = "BaidBackendTokenExpiry"
 
 @Service
 class GoogleAuthService {
@@ -141,14 +143,14 @@ class GoogleAuthService {
     // Save backend token to secure storage
     private fun saveBackendToken(tokenInfo: BackendTokenInfo) {
         val backendTokenAttributes = CredentialAttributes(
-            serviceName = "Baid",
+            serviceName = BAID_BACKEND_TOKEN,
             userName = config.backendTokenKey
         )
         val backendTokenCredential = Credentials("", tokenInfo.backendToken)
         PasswordSafe.instance.set(backendTokenAttributes, backendTokenCredential)
         val expiresAt = Instant.now().epochSecond + tokenInfo.expiresIn
         val expiryAttributes = CredentialAttributes(
-            serviceName = "Baid",
+            serviceName = BAID_BACKEND_TOKEN_EXPIRY,
             userName = config.tokenExpiryKey
         )
         val expiryCredential = Credentials("", expiresAt.toString())
@@ -163,7 +165,7 @@ class GoogleAuthService {
 
     private fun getBackendToken(): String? {
         val attributes = CredentialAttributes(
-            serviceName = "Baid",
+            serviceName = BAID_BACKEND_TOKEN,
             userName = config.backendTokenKey
         )
         return PasswordSafe.instance.getPassword(attributes)
@@ -171,7 +173,7 @@ class GoogleAuthService {
 
     private fun getTokenExpiry(): Long? {
         val attributes = CredentialAttributes(
-            serviceName = "Baid",
+            serviceName = BAID_BACKEND_TOKEN_EXPIRY,
             userName = config.tokenExpiryKey
         )
         return PasswordSafe.instance.getPassword(attributes)?.toLongOrNull()
@@ -186,12 +188,12 @@ class GoogleAuthService {
     // Clear all saved tokens
     private fun clearTokens() {
         val backendTokenAttributes = CredentialAttributes(
-            serviceName = "Baid",
+            serviceName = BAID_BACKEND_TOKEN,
             userName = config.backendTokenKey
         )
         PasswordSafe.instance.set(backendTokenAttributes, null)
         val expiryAttributes = CredentialAttributes(
-            serviceName = "Baid",
+            serviceName = BAID_BACKEND_TOKEN_EXPIRY,
             userName = config.tokenExpiryKey
         )
         PasswordSafe.instance.set(expiryAttributes, null)
