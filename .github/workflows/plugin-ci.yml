@@ -39,7 +39,7 @@ jobs:
         working-directory: intelij-plugin
 
       - name: Build plugin
-        run: ./gradlew clean build
+        run: ./gradlew clean buildPlugin
         working-directory: intelij-plugin
         env:
           BAID_CLIENT_ID: ${{ secrets.BAID_CLIENT_ID }}
