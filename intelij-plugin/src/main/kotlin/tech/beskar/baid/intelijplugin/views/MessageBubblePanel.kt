@@ -350,7 +350,7 @@ class MessageBubblePanel(
         val kit = textPane.getEditorKit() as HTMLEditorKit
         val styleSheet = kit.getStyleSheet()
         styleSheet.addRule("body { font-family: Segoe UI, Helvetica, sans-serif; font-size: 13px; margin: 0; padding: 0; word-wrap: break-word; overflow-wrap: break-word;}")
-        styleSheet.addRule("pre { background-color: #f5f5f5; padding: 8px; border-radius: 4px; overflow-x: auto; max-width: 100%;}")
+        styleSheet.addRule("pre { background-color: #f5f5f5; padding: 8px; margin: 4px; overflow-x: auto; max-width: 100%;}")
         styleSheet.addRule("code { font-family: 'JetBrains Mono', monospace; font-size: 12px; }")
 
         return textPane
