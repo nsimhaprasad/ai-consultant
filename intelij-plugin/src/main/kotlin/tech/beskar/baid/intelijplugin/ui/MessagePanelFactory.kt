@@ -9,6 +9,7 @@ import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.JBUI
 import tech.beskar.baid.intelijplugin.BaidToolWindowPanel
+import java.net.URI
 import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
 import tech.beskar.baid.intelijplugin.model.Message
 import tech.beskar.baid.intelijplugin.util.FontUtil
@@ -226,9 +227,9 @@ class MessagePanelFactory(private val authService: GoogleAuthService) {
 
     private fun loadProfileImage(imageUrl: String, size: Int): ImageIcon? {
         return try {
-            // Download the image from URL
-            val url = URL(imageUrl)
-            val originalImage = ImageIO.read(url) ?: return null
+            // FIXED: Use URI.toURL() instead of deprecated URL(String) constructor
+            val uri = URI.create(imageUrl)
+            val originalImage = ImageIO.read(uri.toURL()) ?: return null
 
             // Create a clean circular image with transparency
             val outputImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)

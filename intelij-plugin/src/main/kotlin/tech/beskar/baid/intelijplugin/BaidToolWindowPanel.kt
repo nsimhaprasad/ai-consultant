@@ -33,6 +33,7 @@ import java.awt.image.BufferedImage
 import java.net.URL
 import javax.imageio.ImageIO
 import javax.swing.*
+import java.net.URI
 
 class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindowPanel>(BorderLayout()) {
     // Update all message bubbles when window is resized
@@ -632,16 +633,16 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
                 isOpaque = false
                 layout = FlowLayout(FlowLayout.RIGHT, 0, 0)
-                
+
                 // First add the bubble
                 add(bubbleContainer)
-                
+
                 var avatarLabel = JLabel().apply {
                     icon = AllIcons.General.User
                     border = JBUI.Borders.emptyRight(JBUI.scale(8))
                     verticalAlignment = JLabel.TOP
                 }
-                
+
                 val userInfo = authService.getUserInfo()
 
                 // Then add the avatar with profile picture if available
@@ -803,27 +804,27 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         val contentPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
             isOpaque = false
 
-                // Agent message: avatar on left, bubble on right
-                val avatarLabel = JLabel().apply {
-                    icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
-                    border = JBUI.Borders.emptyRight(JBUI.scale(8))
-                    verticalAlignment = JLabel.TOP
-                }
-                add(avatarLabel, BorderLayout.WEST)
-                add(bubbleContainer, BorderLayout.CENTER)
+            // Agent message: avatar on left, bubble on right
+            val avatarLabel = JLabel().apply {
+                icon = IconLoader.getIcon("/icons/beskar.svg", BaidToolWindowPanel::class.java)
+                border = JBUI.Borders.emptyRight(JBUI.scale(8))
+                verticalAlignment = JLabel.TOP
+            }
+            add(avatarLabel, BorderLayout.WEST)
+            add(bubbleContainer, BorderLayout.CENTER)
 
-                // Add padding on the right to keep message left-aligned
-                val spacer = JPanel().apply {
-                    isOpaque = false
-                    preferredSize = Dimension(JBUI.scale(100), 0) // Adjust width as needed
-                }
-                add(spacer, BorderLayout.EAST)
+            // Add padding on the right to keep message left-aligned
+            val spacer = JPanel().apply {
+                isOpaque = false
+                preferredSize = Dimension(JBUI.scale(100), 0) // Adjust width as needed
+            }
+            add(spacer, BorderLayout.EAST)
         }
 
         messagePanel.add(contentPanel, BorderLayout.CENTER)
         return messagePanel
     }
-    
+
     private fun loadConversation(userId: String, sessionId: String) {
         // Set current session ID
         currentSessionId = sessionId
@@ -871,40 +872,40 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
 
                 // Create a list to hold all message panels in order
                 val messagePanels = mutableListOf<JBPanel<JBPanel<*>>>()
-                
+
                 // Process all messages first and create panels
                 for (i in 0 until messagesArray.length()) {
                     val message = messagesArray.getJSONObject(i)
                     val role = message.getString("role")
                     val content = message.getString("message")
                     val isUser = role == "user"
-                    
+
                     // Create panel for this message
                     val panel = createMessagePanel(content, isUser)
                     messagePanels.add(panel)
                 }
-                
+
                 // Remove loading message and add all panels in the correct order
                 SwingUtilities.invokeLater {
                     // Remove the loading message
                     chatPanel.remove(loadingMessage)
-                    
+
                     // Add all message panels in order
                     for (panel in messagePanels) {
                         chatPanel.add(panel)
                     }
-                    
+
 //                    // Add a separator to indicate where new messages will start
 //                    val separatorPanel = createSimpleMessagePanel(
 //                        "Continuing this conversation. Any new messages will be part of this session.",
 //                        isUser = false
 //                    )
 //                    chatPanel.add(separatorPanel)
-                    
+
                     // Revalidate and repaint the chat panel
                     chatPanel.revalidate()
                     chatPanel.repaint()
-                    
+
                     scrollToBottom()
                 }
             } catch (e: Exception) {
@@ -919,8 +920,8 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
     private fun loadProfileImage(imageUrl: String, size: Int): ImageIcon? {
         return try {
             // Download the image from URL
-            val url = URL(imageUrl)
-            val originalImage = ImageIO.read(url) ?: return null
+            val uri = URI.create(imageUrl)
+            val originalImage = ImageIO.read(uri.toURL()) ?: return null
 
             // Create a clean circular image with transparency
             val outputImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
@@ -1182,7 +1183,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
         scrollBar.value = scrollBar.maximum
         // Force a repaint to ensure smooth scrolling
         chatScroll.repaint()
-        
+
         // Sometimes content is still being laid out, so schedule another check
         Timer(100) { _ ->
             SwingUtilities.invokeLater {

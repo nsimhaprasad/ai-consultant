@@ -9,7 +9,7 @@ import java.awt.Image
 import java.awt.RenderingHints
 import java.awt.geom.Ellipse2D
 import java.awt.image.BufferedImage
-import java.net.URL
+import java.net.URI
 import javax.imageio.ImageIO
 import javax.swing.ImageIcon
 import javax.swing.JLabel
@@ -17,7 +17,7 @@ import javax.swing.JLabel
 fun getMessageWidth(): Int {
     // Use a reasonable default width that works well for code blocks
     val defaultWidth = JBUI.scale(200)
-    
+
     // Use 80% of default width for better fit, with min and max constraints
     return defaultWidth.coerceAtLeast(JBUI.scale(200)).coerceAtMost(JBUI.scale(500))
 }
@@ -62,9 +62,9 @@ fun createAvatarLabel(picture: String?, size: Int = 24, leftPadding: Boolean = t
 
 private fun loadProfileImage(imageUrl: String, size: Int): ImageIcon? {
     return try {
-        // Download the image from URL
-        val url = URL(imageUrl)
-        val originalImage = ImageIO.read(url) ?: return null
+        // FIXED: Use URI.toURL() instead of deprecated URL(String) constructor
+        val uri = URI.create(imageUrl)
+        val originalImage = ImageIO.read(uri.toURL()) ?: return null
 
         // Create a clean circular image with transparency
         val outputImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)

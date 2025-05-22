@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.util.io.HttpRequests
 import org.json.JSONObject
+import java.net.URI
 import tech.beskar.baid.intelijplugin.config.BaidConfiguration
 import tech.beskar.baid.intelijplugin.model.ChatSession
 import tech.beskar.baid.intelijplugin.model.FileContext
@@ -66,145 +67,147 @@ class BaidAPIService private constructor() {
         }
     }
 
-@Throws( ApiException::class)
-private fun streamAPIRequest(
-    apiUrl: String,
-    payload: JSONObject,
-    accessToken: String?,
-    sessionId: String?,
-    onStreamedBlock: Consumer<JSONObject?>
-): String? {
-    // Prepare headers
-    val headers: MutableMap<String?, String?> = HashMap<String?, String?>()
-    headers.put("Authorization", "Bearer $accessToken")
-    headers.put("Content-Type", "application/json")
+    @Throws(ApiException::class)
+    private fun streamAPIRequest(
+        apiUrl: String,
+        payload: JSONObject,
+        accessToken: String?,
+        sessionId: String?,
+        onStreamedBlock: Consumer<JSONObject?>
+    ): String? {
+        // Prepare headers
+        val headers: MutableMap<String?, String?> = HashMap<String?, String?>()
+        headers.put("Authorization", "Bearer $accessToken")
+        headers.put("Content-Type", "application/json")
 
-    if (sessionId != null && !sessionId.isBlank()) {
-        headers.put("session_id", sessionId)
-    }
-
-    // Track updated session ID
-    val updatedSessionId = arrayOf(sessionId)
-
-    try {
-        // Create a custom URL connection that allows us to access error streams
-        val url = URL(apiUrl)
-        val connection = url.openConnection() as HttpURLConnection
-        
-        // Configure connection
-        connection.requestMethod = "POST"
-        connection.connectTimeout = 30000
-        connection.readTimeout = 300000
-        connection.doOutput = true
-        connection.instanceFollowRedirects = true
-        
-        // Set headers
-        headers.forEach { (key: String?, value: String?) -> 
-            key?.let { connection.setRequestProperty(it, value) }
+        if (sessionId != null && !sessionId.isBlank()) {
+            headers.put("session_id", sessionId)
         }
-        
-        // Send payload
-        connection.outputStream.use { os ->
-            os.write(payload.toString().toByteArray(StandardCharsets.UTF_8))
-            os.flush()
-        }
-        
-        // Check response code
-        val responseCode = connection.responseCode
-        
-        if (responseCode >= 400) {
-            // Read error response
-            val errorResponseText = connection.errorStream?.use { errorStream ->
-                BufferedReader(InputStreamReader(errorStream)).use { reader ->
-                    reader.readText()
-                }
-            } ?: "No error details available"
 
-            val errorResponse = this.parseErrorResponse(errorResponseText)
+        // Track updated session ID
+        val updatedSessionId = arrayOf(sessionId)
 
-            LOG.error("HTTP Error: Status code $responseCode. Response: $errorResponse")
-            throw ApiException(errorResponse.detail.toString(),
-                responseCode,
-                apiUrl
-            )
-        }
-        
-        // Process successful response
-        connection.inputStream.use { inputStream ->
-            BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                var currentLine: String?
-                var jsonBuffer = StringBuilder()
-                var braceCount = 0
-                var inJson = false
-                while (reader.readLine().also { currentLine = it } != null) {
-                    // Skip lines that don't start with "data: "
-                    if (currentLine == null || !currentLine!!.startsWith("data: ")) {
-                        continue
+        try {
+            // Create a custom URL connection that allows us to access error streams
+            val uri = URI.create(apiUrl)
+            val connection = uri.toURL().openConnection() as HttpURLConnection
+
+            // Configure connection
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 30000
+            connection.readTimeout = 300000
+            connection.doOutput = true
+            connection.instanceFollowRedirects = true
+
+            // Set headers
+            headers.forEach { (key: String?, value: String?) ->
+                key?.let { connection.setRequestProperty(it, value) }
+            }
+
+            // Send payload
+            connection.outputStream.use { os ->
+                os.write(payload.toString().toByteArray(StandardCharsets.UTF_8))
+                os.flush()
+            }
+
+            // Check response code
+            val responseCode = connection.responseCode
+
+            if (responseCode >= 400) {
+                // Read error response
+                val errorResponseText = connection.errorStream?.use { errorStream ->
+                    BufferedReader(InputStreamReader(errorStream)).use { reader ->
+                        reader.readText()
                     }
+                } ?: "No error details available"
 
-                    val data = currentLine!!.substring(6).trim { it <= ' ' }  // Remove "data: " prefix
+                val errorResponse = this.parseErrorResponse(errorResponseText)
 
-                    // Check for end of stream marker
-                    if ("[DONE]" == data) {
-                        break
-                    }
+                LOG.error("HTTP Error: Status code $responseCode. Response: $errorResponse")
+                throw ApiException(
+                    errorResponse.detail.toString(),
+                    responseCode,
+                    apiUrl
+                )
+            }
 
-                    // Start or continue JSON object
-                    if (!inJson && data.startsWith("{")) {
-                        jsonBuffer = StringBuilder(data)
-                        braceCount = countBraces(data)
-                        inJson = true
-                    } else if (inJson) {
-                        jsonBuffer.append(data)
-                        braceCount += countBraces(data)
-                    }
-
-                    // If we have a complete JSON object
-                    if (inJson && braceCount == 0) {
-                        val jsonStr = jsonBuffer.toString()
-                        try {
-                            val jsonObj = JSONObject(jsonStr)
-
-                            // Check for session ID update
-                            if (jsonObj.has("session_id")) {
-                                updatedSessionId[0] = jsonObj.optString("session_id", "")
-                            } else {
-                                // Process content block
-                                if (jsonObj.has("error")) {
-                                    throw Exception(jsonObj.getString("error"))
-                                }
-                                SwingUtilities.invokeLater { onStreamedBlock.accept(jsonObj) }
-                            }
-                        } catch (e: Exception) {
-                            LOG.error("Error parsing JSON response: $jsonStr", e)
+            // Process successful response
+            connection.inputStream.use { inputStream ->
+                BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                    var currentLine: String?
+                    var jsonBuffer = StringBuilder()
+                    var braceCount = 0
+                    var inJson = false
+                    while (reader.readLine().also { currentLine = it } != null) {
+                        // Skip lines that don't start with "data: "
+                        if (currentLine == null || !currentLine!!.startsWith("data: ")) {
+                            continue
                         }
 
-                        // Reset for next JSON object
-                        inJson = false
-                        jsonBuffer = StringBuilder()
+                        val data = currentLine!!.substring(6).trim { it <= ' ' }  // Remove "data: " prefix
+
+                        // Check for end of stream marker
+                        if ("[DONE]" == data) {
+                            break
+                        }
+
+                        // Start or continue JSON object
+                        if (!inJson && data.startsWith("{")) {
+                            jsonBuffer = StringBuilder(data)
+                            braceCount = countBraces(data)
+                            inJson = true
+                        } else if (inJson) {
+                            jsonBuffer.append(data)
+                            braceCount += countBraces(data)
+                        }
+
+                        // If we have a complete JSON object
+                        if (inJson && braceCount == 0) {
+                            val jsonStr = jsonBuffer.toString()
+                            try {
+                                val jsonObj = JSONObject(jsonStr)
+
+                                // Check for session ID update
+                                if (jsonObj.has("session_id")) {
+                                    updatedSessionId[0] = jsonObj.optString("session_id", "")
+                                } else {
+                                    // Process content block
+                                    if (jsonObj.has("error")) {
+                                        throw Exception(jsonObj.getString("error"))
+                                    }
+                                    SwingUtilities.invokeLater { onStreamedBlock.accept(jsonObj) }
+                                }
+                            } catch (e: Exception) {
+                                LOG.error("Error parsing JSON response: $jsonStr", e)
+                            }
+
+                            // Reset for next JSON object
+                            inJson = false
+                            jsonBuffer = StringBuilder()
+                        }
                     }
                 }
             }
-        }
-        
-        return updatedSessionId[0]
-    } catch (e: Throwable) {
-        when (e) {
-            is IOException -> {
-                if (e.message?.contains("Server returned HTTP response code:") == true) {
-                    // We already logged the detailed error above
-                    LOG.error("API request failed", e)
-                } else {
-                    LOG.error("Network error when connecting to backend: ${e.message}", e)
+
+            return updatedSessionId[0]
+        } catch (e: Throwable) {
+            when (e) {
+                is IOException -> {
+                    if (e.message?.contains("Server returned HTTP response code:") == true) {
+                        // We already logged the detailed error above
+                        LOG.error("API request failed", e)
+                    } else {
+                        LOG.error("Network error when connecting to backend: ${e.message}", e)
+                    }
+                }
+
+                else -> {
+                    LOG.error("Error from backend: ${e.message}", e)
                 }
             }
-            else -> {
-                LOG.error("Error from backend: ${e.message}", e)
-            }
+            throw e
         }
-        throw e
     }
-}
 
     private fun countBraces(text: String): Int {
         var count = 0

@@ -6,7 +6,7 @@ import java.awt.Image
 import java.awt.RenderingHints
 import java.awt.geom.Ellipse2D
 import java.awt.image.BufferedImage
-import java.net.URL
+import java.net.URI
 import java.util.*
 import java.util.function.Consumer
 import javax.imageio.ImageIO
@@ -46,8 +46,9 @@ class UserProfile
         // Load image in background
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                val url = URL(picture)
-                val originalImage = ImageIO.read(url)
+                // FIXED: Use URI.toURL() instead of deprecated URL(String) constructor
+                val uri = URI.create(picture)
+                val originalImage = ImageIO.read(uri.toURL())
 
                 if (originalImage == null) {
                     SwingUtilities.invokeLater { callback.accept(null) }
