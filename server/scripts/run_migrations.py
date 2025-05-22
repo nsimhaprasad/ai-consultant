@@ -22,7 +22,7 @@ DB_HOST = settings.DB_HOST
 DB_PORT = settings.DB_PORT
 DB_NAME = settings.DB_NAME
 DB_USER = settings.DB_USER
-DB_PASSWORD = settings.DB_PASSWORD
+DB_PASSWORD = settings.DB_PASSWORD.get_secret_value()
 
 # For production, we'll use the secret manager
 DB_CONNECTION_SECRET = settings.DB_CONNECTION_SECRET
