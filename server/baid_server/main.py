@@ -25,6 +25,7 @@ from baid_server.api.middleware import TokenLimitMiddleware
 from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error, users, tenant
 from baid_server.db.database import get_db_pool, close_db_pool
 from baid_server.services.service_factory import ServiceFactory
+from baid_server.utils.git_utils import get_git_commit_sha
 
 # Create FastAPI application
 @asynccontextmanager
@@ -77,10 +78,14 @@ app.add_middleware(TokenLimitMiddleware)
 async def read_root():
     logger.info("Root endpoint called")
 
+    # Get the current git commit SHA
+    git_commit_sha = get_git_commit_sha()
+    
     return {
         "message": "Server is running",
-        "agent_engine_id": os.getenv("AGENT_ENGINE_ID", ""),
-        "database": "PostgreSQL"
+        "agent_engine_id": settings.AGENT_ENGINE_ID,
+        "database": "PostgreSQL",
+        "git_commit_sha": git_commit_sha
     }
 
 

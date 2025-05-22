@@ -50,6 +50,14 @@ COPY baid_server ./baid_server
 # Ensure scripts and migrations directories exist
 RUN mkdir -p /app/scripts /app/migrations
 
+# Create git_info directory
+RUN mkdir -p /app/baid_server/git_info
+
+# Capture git commit SHA during build and write to a file
+# This is done in the build context, not in the container
+ARG GIT_COMMIT_SHA
+RUN if [ -z "$GIT_COMMIT_SHA" ]; then echo "unknown" > /app/baid_server/git_info/commit_sha.txt; else echo "$GIT_COMMIT_SHA" > /app/baid_server/git_info/commit_sha.txt; fi
+
 # Copy migration files and scripts
 COPY scripts/run_migrations.py /app/scripts/
 COPY migrations/*.sql /app/migrations/
