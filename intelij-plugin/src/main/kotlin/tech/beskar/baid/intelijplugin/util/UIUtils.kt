@@ -3,7 +3,6 @@ package tech.beskar.baid.intelijplugin.util
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
 import tech.beskar.baid.intelijplugin.views.CircularAvatarLabel
 import java.awt.Dimension
 import java.awt.Image
@@ -68,7 +67,7 @@ private fun loadProfileImage(imageUrl: String, size: Int): ImageIcon? {
         val originalImage = ImageIO.read(url) ?: return null
 
         // Create a clean circular image with transparency
-        val outputImage = UIUtil.createImage(size, size, BufferedImage.TYPE_INT_ARGB)
+        val outputImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
         val g2d = outputImage.createGraphics()
 
         try {

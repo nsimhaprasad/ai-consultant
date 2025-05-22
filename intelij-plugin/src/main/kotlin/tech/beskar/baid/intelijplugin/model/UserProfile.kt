@@ -1,7 +1,6 @@
 package tech.beskar.baid.intelijplugin.model
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.util.ui.UIUtil
 import org.json.JSONObject
 import java.awt.Image
 import java.awt.RenderingHints
@@ -76,7 +75,7 @@ class UserProfile
     }
 
     private fun createCircularImage(source: BufferedImage, size: Int): BufferedImage {
-        val output = UIUtil.createImage(size, size, BufferedImage.TYPE_INT_ARGB)
+        val output = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
         val g2d = output.createGraphics()
 
         try {

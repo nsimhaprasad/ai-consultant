@@ -1,5 +1,6 @@
 package tech.beskar.baid.intelijplugin.views
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.IconLoader
 import com.intellij.ui.JBColor
@@ -7,7 +8,6 @@ import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.ui.JBUI
-import org.jetbrains.rpc.LOG
 import tech.beskar.baid.intelijplugin.controller.APIController
 import tech.beskar.baid.intelijplugin.model.Block
 import tech.beskar.baid.intelijplugin.model.ChatSession
@@ -33,6 +33,9 @@ import kotlin.math.min
 class ChatPanelView(private val project: Project?) :
     JBPanel<ChatPanelView>(BorderLayout()) {
 
+    companion object {
+        private val LOG = Logger.getInstance(ChatPanelView::class.java)
+    }
 
     private val messagesPanel: JBPanel<JBPanel<*>> = JBPanel<JBPanel<*>>(VerticalLayout(JBUI.scale(8)))
     private val scrollPane: JBScrollPane
@@ -323,6 +326,5 @@ class ChatPanelView(private val project: Project?) :
             timer.start()
         }
     }
-
 
 }

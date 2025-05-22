@@ -13,7 +13,6 @@ import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
 import org.json.JSONArray
 import org.json.JSONObject
 import tech.beskar.baid.intelijplugin.auth.GoogleAuthService
@@ -924,7 +923,7 @@ class BaidToolWindowPanel(private val project: Project) : JBPanel<BaidToolWindow
             val originalImage = ImageIO.read(url) ?: return null
 
             // Create a clean circular image with transparency
-            val outputImage = UIUtil.createImage(size, size, BufferedImage.TYPE_INT_ARGB)
+            val outputImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
             val g2d = outputImage.createGraphics()
 
             try {
