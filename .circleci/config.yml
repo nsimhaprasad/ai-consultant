@@ -1,0 +1,110 @@
+# This config was automatically generated from your source code
+# Stacks detected: cicd:github-actions:.github/workflows,deps:java:intelij-plugin,deps:node:website,deps:python:server,file:setup.py:baid-ci,package_manager:poetry:server,tool:gradle:
+version: 2.1
+orbs:
+  node: circleci/node@5
+  python: circleci/python@2
+jobs:
+  build-node:
+    # Build node project
+    executor: node/default
+    working_directory: ~/project/website
+    steps:
+      - checkout:
+          path: ~/project
+      - node/install-packages:
+          pkg-manager: npm
+      - run:
+          command: npm run build
+      - run:
+          name: Create the ~/artifacts directory if it doesn't exist
+          command: mkdir -p ~/artifacts
+      # Copy output to artifacts dir
+      - run:
+          name: Copy artifacts
+          command: cp -R build dist public .output .next .docusaurus ~/artifacts 2>/dev/null || true
+      - store_artifacts:
+          path: ~/artifacts
+          destination: node-build
+  test-java:
+    docker:
+      - image: cimg/openjdk:17.0
+    working_directory: ~/project/intelij-plugin
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Calculate cache key
+          command: |-
+            find . -name 'pom.xml' -o -name 'gradlew*' -o -name '*.gradle*' | \
+                    sort | xargs cat > /tmp/CIRCLECI_CACHE_KEY
+      - restore_cache:
+          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
+      - run:
+          command: ./gradlew check
+      - store_test_results:
+          path: build/test-results
+      - save_cache:
+          key: cache-{{ checksum "/tmp/CIRCLECI_CACHE_KEY" }}
+          paths:
+            - ~/.gradle/caches
+      - store_artifacts:
+          path: build/reports
+  test-python:
+    # Install dependencies and run tests
+    docker:
+      - image: cimg/python:>=3.12-node
+    working_directory: ~/project/server
+    steps:
+      - checkout:
+          path: ~/project
+      - python/install-packages:
+          pkg-manager: pip-dist
+      - run:
+          name: Run tests
+          command: pytest --junitxml=junit.xml || ((($? == 5)) && echo 'Did not find any tests to run.')
+      - store_test_results:
+          path: junit.xml
+  build-package:
+    # build python package
+    docker:
+      - image: cimg/python:>=3.12-node
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Create the ~/artifacts directory if it doesn't exist
+          command: mkdir -p ~/artifacts
+      - python/dist
+      - store_artifacts:
+          path: dist
+          destination: ~/artifacts
+  deploy:
+    # This is an example deploy job, not actually used by the workflow
+    docker:
+      - image: cimg/base:stable
+    steps:
+      # Replace this with steps to deploy to users
+      - run:
+          name: deploy
+          command: '#e.g. ./deploy.sh'
+      - run:
+          name: found github actions config
+          command: ':'
+workflows:
+  build-and-test:
+    jobs:
+      - build-node:
+          requires:
+            - test-java
+            - test-python
+      - test-java
+      - test-python
+      - build-package:
+          requires:
+            - test-java
+            - test-python
+    # - deploy:
+    #     requires:
+    #       - build-node
+    #       - build-package
