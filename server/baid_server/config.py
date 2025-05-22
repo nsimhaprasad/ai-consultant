@@ -47,12 +47,12 @@ class Settings(BaseSettings):
     DB_NAME: Optional[str] = None
     DB_USER: Optional[str] = None
     PROJECT_ID: Optional[str] = None
+    JWT_SECRET: Optional[str] = None
 
     # Secrets
     AGENT_ENGINE_ID: Optional[SecretStr] = None
     GOOGLE_CLIENT_SECRET: Optional[SecretStr] = None
     DB_PASSWORD: Optional[SecretStr] = None
-    JWT_SECRET: Optional[SecretStr] = None
 
     # Database config
     model_config = SettingsConfigDict(

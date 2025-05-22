@@ -9,7 +9,7 @@ from jose import jwt
 from baid_server.config import settings
 
 # JWT configuration
-JWT_SECRET = settings.JWT_SECRET.get_secret_value()
+JWT_SECRET = settings.JWT_SECRET if settings.JWT_SECRET else None
 JWT_ALGORITHM = "HS256"
 
 logger = logging.getLogger(__name__)
