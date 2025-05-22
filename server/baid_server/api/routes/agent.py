@@ -6,7 +6,9 @@ from fastapi import APIRouter, Request, Header, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 
 from baid_server.api.dependencies import get_current_user
-from baid_server.services.service_factory import ServiceFactory
+# Removed: from baid_server.services.service_factory import ServiceFactory
+from baid_server.services.agent_service import AgentService # Added
+from baid_server.services.dependencies import get_agent_service # Added
 
 router = APIRouter(tags=["agent"])
 logger = logging.getLogger(__name__)
@@ -15,7 +17,8 @@ logger = logging.getLogger(__name__)
 async def consult(
         request: Request,
         current_user: Dict[str, Any] = Depends(get_current_user),
-        session_id: Optional[str] = Header(None, alias="session_id")
+        session_id: Optional[str] = Header(None, alias="session_id"),
+        service: AgentService = Depends(get_agent_service) # Added
 ):
     request_id = os.urandom(4).hex()
     logger.info(f"[{request_id}] === Starting /consult request ===")
@@ -33,7 +36,7 @@ async def consult(
     
     # Return streaming response
     return StreamingResponse(
-        ServiceFactory.get_agent_service().process_query(
+        service.process_query( # Modified: Use injected service
             user_id=user_id,
             session_id=session_id,
             user_input=user_input,

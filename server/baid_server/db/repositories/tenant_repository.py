@@ -11,19 +11,12 @@ logger = logging.getLogger(__name__)
 class TenantRepository:
     """Repository for tenant-related database operations."""
 
-    def __init__(self, db_pool: Optional[asyncpg.Pool] = None):
+    def __init__(self, db_pool: asyncpg.Pool):
         self._db_pool = db_pool
-
-    async def _get_pool(self):
-        """Get the database pool."""
-        from baid_server.db.database import get_db_pool
-        if not self._db_pool:
-            self._db_pool = await get_db_pool()
-        return self._db_pool
 
     async def create_tenant(self, name: str, slug: str) -> UUID:
         """Create a new tenant."""
-        pool = await self._get_pool()
+        pool = self._db_pool
         async with pool.acquire() as conn:
             try:
                 tenant_id = await conn.fetchval('''
@@ -38,9 +31,9 @@ class TenantRepository:
                 logger.error(f"Error creating tenant: {str(e)}")
                 raise
 
-    async def get_tenant_by_id(self, tenant_id: UUID) -> Dict[str, Any]:
+    async def get_tenant_by_id(self, tenant_id: UUID) -> Optional[Dict[str, Any]]:
         """Get a tenant by ID."""
-        pool = await self._get_pool()
+        pool = self._db_pool
         async with pool.acquire() as conn:
             row = await conn.fetchrow('''
             SELECT id, name, slug, created_at, updated_at
@@ -59,9 +52,9 @@ class TenantRepository:
                 "updated_at": row["updated_at"]
             }
 
-    async def get_tenant_by_slug(self, slug: str) -> Dict[str, Any]:
+    async def get_tenant_by_slug(self, slug: str) -> Optional[Dict[str, Any]]:
         """Get a tenant by slug."""
-        pool = await self._get_pool()
+        pool = self._db_pool
         async with pool.acquire() as conn:
             row = await conn.fetchrow('''
             SELECT id, name, slug, created_at, updated_at
@@ -82,7 +75,7 @@ class TenantRepository:
 
     async def list_tenants(self) -> List[Dict[str, Any]]:
         """List all tenants."""
-        pool = await self._get_pool()
+        pool = self._db_pool
         async with pool.acquire() as conn:
             rows = await conn.fetch('''
             SELECT id, name, slug, created_at, updated_at
@@ -104,7 +97,7 @@ class TenantRepository:
 
     async def update_tenant(self, tenant_id: UUID, name: str, slug: str) -> bool:
         """Update a tenant."""
-        pool = await self._get_pool()
+        pool = self._db_pool
         async with pool.acquire() as conn:
             try:
                 result = await conn.execute('''
@@ -125,7 +118,7 @@ class TenantRepository:
 
     async def delete_tenant(self, tenant_id: UUID) -> bool:
         """Delete a tenant (will fail if there are associated users or API keys)."""
-        pool = await self._get_pool()
+        pool = self._db_pool
         async with pool.acquire() as conn:
             try:
                 result = await conn.execute('''

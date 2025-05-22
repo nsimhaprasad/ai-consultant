@@ -2,81 +2,60 @@
 from typing import List, Optional
 from uuid import UUID
 
+import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from baid_server.api.dependencies import get_current_user
+from baid_server.db.database import get_db_pool
 from baid_server.db.repositories.tenant_repository import TenantRepository
 from baid_server.db.repositories.user_repository import UserRepository
 from baid_server.models.tenant import TenantCreate, TenantResponse
 from baid_server.models.user import UserInfo
+from baid_server.services.tenant_service import TenantService
+from baid_server.services.dependencies import get_tenant_service
 
 router = APIRouter(prefix="/api/tenants", tags=["tenants"])
 
 
-async def get_tenant_repository():
-    """Dependency to get the tenant repository."""
-    return TenantRepository()
-
-async def get_user_repository():
-    """Dependency to get the user repository."""
-    return UserRepository()
+# Removed local get_tenant_repository and get_user_repository functions
+# These are now handled by centralized dependencies in db.dependencies.py
+# and consumed by service dependencies in services.dependencies.py
 
 @router.post("", response_model=TenantResponse, status_code=status.HTTP_201_CREATED)
 async def create_tenant(
     tenant_data: TenantCreate,
-    current_user: dict = Depends(get_current_user),
-    tenant_repository: TenantRepository = Depends(get_tenant_repository),
+    current_user: dict = Depends(get_current_user), # Kept for potential future use in service
+    service: TenantService = Depends(get_tenant_service),
 ):
     """Create a new tenant."""
-    # In a real application, you might want to check if the user has permission to create tenants
-    try:
-        tenant_id = await tenant_repository.create_tenant(
-            name=tenant_data.name,
-            slug=tenant_data.slug,
-        )
-        
-        tenant = await tenant_repository.get_tenant_by_id(tenant_id)
-        return TenantResponse(**tenant)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to create tenant: {str(e)}",
-        )
+    # current_user can be passed to service method if needed for authorization
+    return await service.create_tenant(tenant_data=tenant_data)
 
 
 @router.get("", response_model=List[TenantResponse])
 async def list_tenants(
-    current_user: dict = Depends(get_current_user),
-    tenant_repository: TenantRepository = Depends(get_tenant_repository),
+    current_user: dict = Depends(get_current_user), # Kept
+    service: TenantService = Depends(get_tenant_service),
 ):
     """List all tenants."""
-    # In a real application, you might want to filter tenants based on user permissions
-    tenants = await tenant_repository.list_tenants()
-    return [TenantResponse(**tenant) for tenant in tenants]
+    return await service.list_tenants()
 
 
 @router.get("/{tenant_id}", response_model=TenantResponse)
 async def get_tenant(
     tenant_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    tenant_repository: TenantRepository = Depends(get_tenant_repository),
+    current_user: dict = Depends(get_current_user), # Kept
+    service: TenantService = Depends(get_tenant_service),
 ):
     """Get a tenant by ID."""
-    tenant = await tenant_repository.get_tenant_by_id(tenant_id)
-    if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tenant with ID {tenant_id} not found",
-        )
-    return TenantResponse(**tenant)
+    return await service.get_tenant(tenant_id=tenant_id)
 
 @router.get("/{tenant_id}/users", response_model=List[UserInfo])
 async def get_tenant_users(
     tenant_id: UUID,
-    current_user: dict = Depends(get_current_user),
-    user_repository: UserRepository = Depends(get_user_repository)
+    current_user: dict = Depends(get_current_user), # Kept
+    service: TenantService = Depends(get_tenant_service),
 ):
-    """Get a tenant by ID."""
-    users = await user_repository.get_users_by_tenant(tenant_id)
-    return [UserInfo(**user) for user in users]
+    """Get all users for a specific tenant."""
+    return await service.get_tenant_users(tenant_id=tenant_id)

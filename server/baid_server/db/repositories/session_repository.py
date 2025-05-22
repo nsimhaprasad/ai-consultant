@@ -10,17 +10,14 @@ logger = logging.getLogger(__name__)
 
 
 class SessionRepository:
-    def __init__(self, db_pool: Optional[asyncpg.Pool] = None):
+    def __init__(self, db_pool: asyncpg.Pool): # Modified: db_pool is now required
         self._db_pool = db_pool
     
-    async def _get_pool(self) -> asyncpg.Pool:
-        if self._db_pool is None:
-            return await get_db_pool()
-        return self._db_pool
+    # Removed _get_pool method
 
     async def store_session_mapping(self, user_id: str, session_id: str) -> None:
         logger.info(f"Storing/updating session mapping: user_id={user_id}, session_id={session_id}")
-        pool = await self._get_pool()
+        pool = self._db_pool # Modified: Use self._db_pool directly
         async with pool.acquire() as conn:
             try:
                 await conn.execute('''
@@ -35,7 +32,7 @@ class SessionRepository:
                 raise
 
     async def session_exists(self, user_id: str, session_id: str) -> bool:
-        pool = await self._get_pool()
+        pool = self._db_pool # Modified: Use self._db_pool directly
         async with pool.acquire() as conn:
             try:
                 result = await conn.fetchval('''
@@ -48,7 +45,7 @@ class SessionRepository:
                 return False
 
     async def get_user_sessions(self, user_id: str) -> List[Dict[str, Any]]:
-        pool = await self._get_pool()
+        pool = self._db_pool # Modified: Use self._db_pool directly
         async with pool.acquire() as conn:
             rows = await conn.fetch('''
             SELECT session_id, created_at, last_used_at 
@@ -69,7 +66,7 @@ class SessionRepository:
         return sessions
 
     async def delete_session(self, user_id: str, session_id: str) -> None:
-        pool = await self._get_pool()
+        pool = self._db_pool # Modified: Use self._db_pool directly
         async with pool.acquire() as conn:
             # Use a transaction to ensure both deletions happen or neither does
             async with conn.transaction():

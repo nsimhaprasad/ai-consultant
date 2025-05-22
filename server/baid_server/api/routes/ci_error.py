@@ -7,7 +7,9 @@ from fastapi.responses import StreamingResponse
 from baid_server.api.dependencies import get_current_user
 from baid_server.models.ci_error import CIErrorRequest
 from baid_server.prompts.format import CI_RESPONSE_FORMAT
-from baid_server.services.service_factory import ServiceFactory
+# Removed: from baid_server.services.service_factory import ServiceFactory
+from baid_server.services.ci_error_service import CIErrorService # Added
+from baid_server.services.dependencies import get_ci_error_service # Added
 
 router = APIRouter(tags=["ci"])
 logger = logging.getLogger(__name__)
@@ -18,7 +20,8 @@ AGENT_RESOURCE_NAME = "projects/742371152853/locations/us-central1/reasoningEngi
 async def analyze_ci_error(
         request: CIErrorRequest,
         current_user: Dict[str, Any] = Depends(get_current_user),
-        session_id: Optional[str] = Header(None, alias="session_id")
+        session_id: Optional[str] = Header(None, alias="session_id"),
+        service: CIErrorService = Depends(get_ci_error_service) # Added
 ):
     request_id = os.urandom(4).hex()
     logger.info(f"[{request_id}] === Starting CI error analysis request ===")
@@ -55,11 +58,11 @@ Make sure your response is in the following JSON format:
 Stream your response as a series of rfc8259 JSON format only. Do not include any other characters or formatting. Each chunk should be a valid JSON object.
 """
     try:
-        # Get the CI Error Service
-        ci_error_service = await ServiceFactory.initialize_ci_error_service()
+        # Get the CI Error Service via dependency injection
+        # Removed: ci_error_service = await ServiceFactory.initialize_ci_error_service()
         
         # Create a streaming response using the CI Error Service
-        response_stream = ci_error_service.analyze_error(
+        response_stream = service.analyze_error( # Modified: Use injected service
             prompt=prompt,
             user_id=user_id,
             session_id=session_id,

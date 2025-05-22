@@ -9,16 +9,11 @@ from jose import jwt
 
 from baid_server.db.repositories.user_repository import UserRepository
 
+from baid_server.config import OAuthConfig, JWTConfig # Added import
+
 logger = logging.getLogger(__name__)
 
-# OAuth configuration
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
-REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "https://core.baid.dev/api/auth/google-login")
-
-# JWT configuration
-JWT_SECRET = os.environ.get("JWT_SECRET", "a-string-secret-at-least-256-bits-long")
-JWT_ALGORITHM = "HS256"
+# OAuth and JWT configurations are now injected via __init__
 
 # In-memory session storage
 oauth_sessions: Dict[str, Dict[str, Any]] = {}
@@ -32,10 +27,16 @@ def cleanup_state(state: str) -> None:
 class AuthService:
     """Service for authentication and authorization."""
 
-    def __init__(self, user_repository: Optional[UserRepository] = None):
+    def __init__(self, user_repository: UserRepository, oauth_config: OAuthConfig, jwt_config: JWTConfig): # Modified
         self._user_repository = user_repository
+        self._oauth_config = oauth_config # Added
+        self._jwt_config = jwt_config # Added
 
     async def exchange_google_code(self, code: str, redirect_uri: str, state: str) -> Dict[str, Any]:
+        # Ensure redirect_uri from parameter is used, or self._oauth_config.GOOGLE_REDIRECT_URI if that's intended
+        # The current method signature takes redirect_uri as a param, which might be for flexibility.
+        # For this refactor, I'll assume the passed 'redirect_uri' is the one to use.
+        # If GOOGLE_REDIRECT_URI from config is always the one, the method signature could be simplified.
         try:
             # Exchange code for token
             async with httpx.AsyncClient() as client:
@@ -43,9 +44,9 @@ class AuthService:
                     "https://oauth2.googleapis.com/token",
                     data={
                         "code": code,
-                        "client_id": GOOGLE_CLIENT_ID,
-                        "client_secret": GOOGLE_CLIENT_SECRET,
-                        "redirect_uri": redirect_uri,
+                        "client_id": self._oauth_config.GOOGLE_CLIENT_ID, # Modified
+                        "client_secret": self._oauth_config.GOOGLE_CLIENT_SECRET.get_secret_value() if self._oauth_config.GOOGLE_CLIENT_SECRET else None, # Modified
+                        "redirect_uri": redirect_uri, # Using parameter, as per original logic
                         "grant_type": "authorization_code"
                     },
                     headers={"Content-Type": "application/x-www-form-urlencoded"}
@@ -84,7 +85,7 @@ class AuthService:
                 "name": userinfo["name"],
                 "picture": userinfo.get("picture"),
                 "exp": (datetime.now(timezone.utc) + timedelta(hours=8)).timestamp()
-            }, JWT_SECRET, algorithm=JWT_ALGORITHM)
+            }, self._jwt_config.JWT_SECRET.get_secret_value() if self._jwt_config.JWT_SECRET else None, algorithm=self._jwt_config.JWT_ALGORITHM) # Modified
 
             # Store in session cache
             session_data = {
@@ -126,19 +127,43 @@ class AuthService:
 
     def create_jwt_token(self, user_id: str, email: str, name: str, expires_in_hours: int = 8):
         """Create a JWT token for the specified user."""
-        from datetime import datetime, timedelta, timezone
-        from jose import jwt
-        import os
-
-        JWT_SECRET = os.environ.get("JWT_SECRET", "a-string-secret-at-least-256-bits-long")
-        JWT_ALGORITHM = "HS256"
-
+        # Imports already at top level, os import not needed here for JWT_SECRET
+        
         # Create JWT token
         token = jwt.encode({
             "sub": user_id,
             "email": email,
             "name": name,
             "exp": (datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)).timestamp()
-        }, JWT_SECRET, algorithm=JWT_ALGORITHM)
+        }, self._jwt_config.JWT_SECRET.get_secret_value() if self._jwt_config.JWT_SECRET else None, algorithm=self._jwt_config.JWT_ALGORITHM) # Modified
 
         return token
+
+    async def authenticate_via_api_key(self, api_key: str) -> Dict[str, Any]:
+        """
+        Authenticate using an API key, validate it, and return a JWT session token.
+        """
+        from fastapi import HTTPException, status # Local import for HTTPException
+
+        user_info = await self._user_repository.validate_api_key(api_key)
+
+        if not user_info:
+            logger.warning(f"API key validation failed for key: {api_key[:10]}...") # Log prefix
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+
+        # User info from validate_api_key includes: "email", "name", "user_id"
+        # Ensure "user_id" from validate_api_key is the one expected by create_jwt_token as "sub"
+        token = self.create_jwt_token(
+            user_id=user_info["user_id"], # This should map to 'sub' in JWT
+            email=user_info["email"],
+            name=user_info["name"]
+            # expires_in_hours is defaulted in create_jwt_token
+        )
+
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in": 8 * 3600,  # Corresponds to default 8 hours
+            "email": user_info["email"],
+            "name": user_info["name"]
+        }

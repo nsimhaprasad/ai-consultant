@@ -16,30 +16,12 @@ from baid_server.db.repositories.session_repository import SessionRepository
 from baid_server.core.parser.agent_response import parse_agent_stream
 from baid_server.utils.response_parser import ResponseParser
 from baid_server.prompts import RESPONSE_FORMAT
+from baid_server.config import AgentConfigModel # Added import
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class AgentConfig:
-    project_id: str = os.getenv("PROJECT_ID", "742371152853")
-    location: str = os.getenv("LOCATION", "us-central1")
-    agent_engine_id: str = os.getenv("AGENT_ENGINE_ID", "")
-    
-    @property
-    def agent_engine_id_only(self) -> str:
-        """Get just the ID portion of the agent engine ID."""
-        return self.agent_engine_id.split('/')[-1] if self.agent_engine_id else ""
-    
-    @property
-    def reasoning_engine_app_name(self) -> str:
-        """Get the reasoning engine app name."""
-        if not self.agent_engine_id_only:
-            raise ValueError(
-                "AGENT_ENGINE_ID is not set or is invalid. Please set the AGENT_ENGINE_ID environment variable to a valid Vertex AI Agent resource ID."
-            )
-        return self.agent_engine_id_only
-
+# Removed AgentConfig dataclass, will use AgentConfigModel from config.py
 
 class AgentService:
     def __init__(
@@ -47,30 +29,18 @@ class AgentService:
         message_repository: MessageRepository,
         session_repository: SessionRepository,
         response_processor: ResponseParser,
-        config: AgentConfig = None,
-        session_service: Optional[VertexAiSessionService] = None,
+        config: AgentConfigModel, # Modified: Use AgentConfigModel, now required
+        session_service: VertexAiSessionService, # Modified: Now required
+        execution_client: ReasoningEngineExecutionServiceClient, # Added: Now required
     ):
-        self.config = config or AgentConfig()
+        self.config = config # Modified: Use injected config
         self.message_repository = message_repository
         self.session_repository = session_repository
         self.response_processor = response_processor
-        api_endpoint = f"{self.config.location}-aiplatform.googleapis.com"
-        self.execution_client = ReasoningEngineExecutionServiceClient(client_options={"api_endpoint": api_endpoint})
+        self.execution_client = execution_client # Modified: Use injected client
+        self.session_service = session_service # Modified: Use injected service
 
-        
-        # Initialize session service if not provided
-        if session_service is None:
-            try:
-                self.session_service = VertexAiSessionService(
-                    project=self.config.project_id,
-                    location=self.config.location
-                )
-                logger.info("Successfully initialized VertexAiSessionService")
-            except Exception as e:
-                logger.error(f"Failed to initialize VertexAiSessionService: {str(e)}")
-                raise
-        else:
-            self.session_service = session_service
+        # Internal instantiations of session_service and execution_client are removed.
 
     def get_agent(self) -> AgentEngine:
         logger.debug("Getting ReasoningEngine instance")

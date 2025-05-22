@@ -24,7 +24,7 @@ from baid_server.api.middleware import TokenLimitMiddleware
 
 from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error, users, tenant
 from baid_server.db.database import get_db_pool, close_db_pool
-from baid_server.services.service_factory import ServiceFactory
+# Removed: from baid_server.services.service_factory import ServiceFactory
 
 # Create FastAPI application
 @asynccontextmanager
@@ -34,11 +34,12 @@ async def lifespan(app: FastAPI):
         await get_db_pool()
         logger.info("Database connection pool initialized")
 
-        # Initialize agent service
-        await ServiceFactory.initialize_agent_service()
+        # Service initializations (e.g., AgentService, CIErrorService) are now handled by FastAPI's
+        # dependency injection system when routes are called. No explicit initialization here.
+        # Removed: await ServiceFactory.initialize_agent_service()
         yield
     except Exception as e:
-        logger.error(f"Failed to initialize services: {str(e)}")
+        logger.error(f"Error during application lifespan: {str(e)}") # Modified error message
         yield
     finally:
         # Cleanup on shutdown
