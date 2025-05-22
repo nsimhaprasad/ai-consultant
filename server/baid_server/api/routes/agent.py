@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from baid_server.api.dependencies import get_current_user
 from baid_server.services.service_factory import ServiceFactory
 
-router = APIRouter(tags=["agent"])
+router = APIRouter(prefix="/api", tags=["agent"])
 logger = logging.getLogger(__name__)
 
 @router.post("/consult")
