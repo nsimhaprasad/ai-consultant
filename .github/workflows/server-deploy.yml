@@ -218,7 +218,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build --build-arg VERSION=${{ env.VERSION }} -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} ./server
+          docker build --build-arg VERSION=${{ env.VERSION }} --build-arg GIT_COMMIT_SHA=${{ github.sha }} -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} ./server
 
       - name: Push Docker image
         run: |
