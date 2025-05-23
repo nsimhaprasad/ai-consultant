@@ -3,8 +3,7 @@ from typing import Optional
 
 from langchain_google_vertexai import HarmBlockThreshold, HarmCategory
 from vertexai import agent_engines
-from prompts import TDD_PROMPT, SOLID_PRINCIPLES_PROMPT, CODE_REVIEW_BEST_PRACTICES, CLEAN_CODE_PROMPT, REFACTORING_BEST_PRACTICES
-
+from . import TDD_PROMPT, SOLID_PRINCIPLES_PROMPT, CODE_REVIEW_BEST_PRACTICES, CLEAN_CODE_PROMPT, REFACTORING_BEST_PRACTICES
 model = "gemini-2.5-pro-preview-03-25"
 
 def get_session_history(session_id: str):
