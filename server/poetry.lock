@@ -373,18 +373,6 @@ files = [
 markers = {main = "platform_system == \"Windows\"", dev = "sys_platform == \"win32\""}
 
 [[package]]
-name = "configobj"
-version = "5.0.9"
-description = "Config file reading, writing and validation."
-optional = false
-python-versions = ">=3.7"
-groups = ["main"]
-files = [
-    {file = "configobj-5.0.9-py2.py3-none-any.whl", hash = "sha256:1ba10c5b6ee16229c79a05047aeda2b55eb4e80d7c7d8ecf17ec1ca600c79882"},
-    {file = "configobj-5.0.9.tar.gz", hash = "sha256:03c881bbf23aa07bccf1b837005975993c4ab4427ba57f959afdd9d1a2386848"},
-]
-
-[[package]]
 name = "cryptography"
 version = "45.0.2"
 description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
@@ -566,18 +554,6 @@ typing-extensions = ">=4.8.0"
 [package.extras]
 all = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "httpx (>=0.23.0)", "itsdangerous (>=1.1.0)", "jinja2 (>=3.1.5)", "orjson (>=3.2.1)", "pydantic-extra-types (>=2.0.0)", "pydantic-settings (>=2.0.0)", "python-multipart (>=0.0.18)", "pyyaml (>=5.3.1)", "ujson (>=4.0.1,!=4.0.2,!=4.1.0,!=4.2.0,!=4.3.0,!=5.0.0,!=5.1.0)", "uvicorn[standard] (>=0.12.0)"]
 standard = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "httpx (>=0.23.0)", "jinja2 (>=3.1.5)", "python-multipart (>=0.0.18)", "uvicorn[standard] (>=0.12.0)"]
-
-[[package]]
-name = "future"
-version = "1.0.0"
-description = "Clean single-source support for Python 3 and 2"
-optional = false
-python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
-groups = ["main"]
-files = [
-    {file = "future-1.0.0-py3-none-any.whl", hash = "sha256:929292d34f5872e70396626ef385ec22355a1fae8ad29e1a734c3e43f9fbc216"},
-    {file = "future-1.0.0.tar.gz", hash = "sha256:bd2968309307861edae1458a4f8a4f3598c03be43b97521076aebf5d94c07b05"},
-]
 
 [[package]]
 name = "google-adk"
@@ -890,7 +866,7 @@ grpc-google-iam-v1 = ">=0.12.4,<1.0.0"
 opentelemetry-api = ">=1.9.0"
 proto-plus = [
     {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
-    {version = ">=1.22.2,<2.0.0", markers = "python_version >= \"3.11\""},
+    {version = ">=1.22.2,<2.0.0", markers = "python_version >= \"3.11\" and python_version < \"3.13\""},
 ]
 protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
 
@@ -934,7 +910,7 @@ google-auth = ">=2.14.1,<2.24.0 || >2.24.0,<2.25.0 || >2.25.0,<3.0.0"
 grpc-google-iam-v1 = ">=0.14.0,<1.0.0"
 proto-plus = [
     {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
-    {version = ">=1.22.3,<2.0.0", markers = "python_version < \"3.13\""},
+    {version = ">=1.22.3,<2.0.0"},
 ]
 protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
 
@@ -2147,18 +2123,6 @@ files = [
 cli = ["click (>=5.0)"]
 
 [[package]]
-name = "python-gnupg"
-version = "0.5.4"
-description = "A wrapper for the Gnu Privacy Guard (GPG or GnuPG)"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "python-gnupg-0.5.4.tar.gz", hash = "sha256:f2fdb5fb29615c77c2743e1cb3d9314353a6e87b10c37d238d91ae1c6feae086"},
-    {file = "python_gnupg-0.5.4-py2.py3-none-any.whl", hash = "sha256:40ce25cde9df29af91fe931ce9df3ce544e14a37f62b13ca878c897217b2de6c"},
-]
-
-[[package]]
 name = "python-jose"
 version = "3.4.0"
 description = "JOSE implementation in Python"
@@ -2180,21 +2144,6 @@ cryptography = ["cryptography (>=3.4.0)"]
 pycrypto = ["pycrypto (>=2.6.0,<2.7.0)"]
 pycryptodome = ["pycryptodome (>=3.3.1,<4.0.0)"]
 test = ["pytest", "pytest-cov"]
-
-[[package]]
-name = "python-ldap"
-version = "3.4.4"
-description = "Python modules for implementing LDAP clients"
-optional = false
-python-versions = ">=3.6"
-groups = ["main"]
-files = [
-    {file = "python-ldap-3.4.4.tar.gz", hash = "sha256:7edb0accec4e037797705f3a05cbf36a9fde50d08c8f67f2aef99a2628fab828"},
-]
-
-[package.dependencies]
-pyasn1 = ">=0.3.7"
-pyasn1_modules = ">=0.1.5"
 
 [[package]]
 name = "python-multipart"
@@ -2323,24 +2272,6 @@ files = [
 
 [package.dependencies]
 pyasn1 = ">=0.1.3"
-
-[[package]]
-name = "secrets"
-version = "1.0.2"
-description = "Scripts to manage LDAP users and change LDAP passwords"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "secrets-1.0.2-py2-none-any.whl", hash = "sha256:15a7e07b91bd3fd42b0893415fc1be14236e030d7edb33492cf966cf3936e815"},
-    {file = "secrets-1.0.2.tar.gz", hash = "sha256:37075ab08607092e76da2b86e94dd38a0216ec80088a0a3f9220077750aeddf9"},
-]
-
-[package.dependencies]
-configobj = "*"
-python-gnupg = "*"
-python-ldap = "*"
-systematic = ">=3.0.0"
 
 [[package]]
 name = "setuptools"
@@ -2596,22 +2527,6 @@ dev = ["freezegun (>=0.2.8)", "mypy (>=1.4)", "pretend", "pytest (>=6.0)", "pyte
 docs = ["cogapp", "furo", "myst-parser", "sphinx", "sphinx-notfound-page", "sphinxcontrib-mermaid", "sphinxext-opengraph", "twisted"]
 tests = ["freezegun (>=0.2.8)", "pretend", "pytest (>=6.0)", "pytest-asyncio (>=0.17)", "simplejson"]
 typing = ["mypy (>=1.4)", "rich", "twisted"]
-
-[[package]]
-name = "systematic"
-version = "4.8.7"
-description = "Sysadmin utility classes and scripts"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "systematic-4.8.7-py3-none-any.whl", hash = "sha256:1abbaac95b78f7421b4baa0e946f978a2e37b3e076a036d9813b26bdd8f5fe00"},
-    {file = "systematic-4.8.7.tar.gz", hash = "sha256:3b7715c7cca3a460a38fbaa8ef20c8327f94147ce2e3a2e1d105b232ab353a11"},
-]
-
-[package.dependencies]
-configobj = "*"
-future = "*"
 
 [[package]]
 name = "tree-sitter"
@@ -2938,4 +2853,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "f5bd91c81c512272d64de354f6a4654c8466a08f5e411ceb4b3188478978e2e4"
+content-hash = "5d5054af44dddb1873c244db2566ee479ccbe357c94154c6357918adf8591761"
