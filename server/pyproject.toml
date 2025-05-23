@@ -25,7 +25,6 @@ setuptools = "^80.1.0"
 wheel = "^0.43.0"
 pyjwt = "^2.10.1"
 jinja2 = "^3.1.2"
-
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
 pytest-asyncio = "^0.26.0"

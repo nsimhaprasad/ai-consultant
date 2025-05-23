@@ -29,6 +29,7 @@ from absl import app
 from absl import flags
 from dotenv import load_dotenv
 from ai_consultant_agent.agent import root_agent
+from langchian_agent import langchain_agent
 import vertexai
 from vertexai import agent_engines
 from vertexai.preview.reasoning_engines import AdkApp
@@ -66,6 +67,27 @@ def create() -> None:
             "absl-py (>=2.2.1,<3.0.0)"
         ],
         extra_packages=["./ai_consultant_agent"],
+    )
+    resource_name = remote_agent.resource_name
+    print(f"Created remote agent: {resource_name}")
+    # Write resource_name to a file for server redeployment automation
+    with open("agent_resource.txt", "w") as f:
+        f.write(resource_name)
+
+
+def create_langchain_agent() -> None:
+    requirements = [
+        "google-cloud-aiplatform[agent_engines,langchain]==1.91.0",
+        "cloudpickle==3.0",
+        "langchain_google_vertexai==2.0.19",
+        "langchain_google_firestore==0.5.0",
+    ]
+    extra_packages = ["./langchian_agent"]
+    remote_agent = agent_engines.create(
+        agent_engine=langchain_agent,
+        display_name="langchain_agent",
+        requirements=requirements,
+        extra_packages=extra_packages,
     )
     resource_name = remote_agent.resource_name
     print(f"Created remote agent: {resource_name}")

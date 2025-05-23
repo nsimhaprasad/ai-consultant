@@ -8,6 +8,7 @@ from baid_server.services.agent_service import AgentService, AgentConfig
 from baid_server.services.ci_error_service import CIErrorService, CIErrorServiceConfig
 from baid_server.db.repositories.message_repository import MessageRepository
 from baid_server.db.repositories.session_repository import SessionRepository
+from baid_server.services.langchain_agent_service import LangchainAgentService
 from baid_server.utils.response_parser import ResponseParser
 from baid_server.db.database import get_db_pool
 
@@ -16,24 +17,20 @@ logger = logging.getLogger(__name__)
 T = TypeVar('T')
 
 class ServiceFactory(Generic[T]):
-    _agent_service: Optional[AgentService] = None
+    _agent_service: Optional[LangchainAgentService] = None
     _ci_error_service: Optional[CIErrorService] = None
 
     @classmethod
-    async def initialize_agent_service(cls) -> AgentService:
+    async def initialize_agent_service(cls) -> LangchainAgentService:
         if cls._agent_service is None:
             logger.info("Initializing agent service")
             db_pool = await get_db_pool()
             
-            cls._agent_service = AgentService(
+            cls._agent_service = LangchainAgentService(
                 config=AgentConfig(
                     agent_engine_id=os.getenv("AGENT_ENGINE_ID", ""),
                     project_id=os.getenv("PROJECT_ID", ""),
                     location=os.getenv("LOCATION", ""),
-                ),
-                session_service=VertexAiSessionService(
-                    project=os.getenv("PROJECT_ID", ""),
-                    location=os.getenv("LOCATION", "")
                 ),
                 message_repository=MessageRepository(db_pool=db_pool),
                 session_repository=SessionRepository(db_pool=db_pool),
