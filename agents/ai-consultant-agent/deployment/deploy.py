@@ -29,7 +29,7 @@ from absl import app
 from absl import flags
 from dotenv import load_dotenv
 from ai_consultant_agent.agent import root_agent
-from langchian_agent import langchain_agent
+from langchian_agent.langchain_agent import langchain_agent
 import vertexai
 from vertexai import agent_engines
 from vertexai.preview.reasoning_engines import AdkApp
@@ -43,6 +43,7 @@ flags.DEFINE_string("resource_id", None, "ReasoningEngine resource ID.")
 flags.DEFINE_bool("list", False, "List all agents.")
 flags.DEFINE_bool("create", False, "Creates a new agent.")
 flags.DEFINE_bool("delete", False, "Deletes an existing agent.")
+flags.DEFINE_bool("create_langchain_agent", False, "Creates a langchain new agent.")
 flags.mark_bool_flags_as_mutual_exclusive(["create", "delete"])
 
 _AI_PLATFORM_GIT = (
@@ -77,7 +78,7 @@ def create() -> None:
 
 def create_langchain_agent() -> None:
     requirements = [
-        "google-cloud-aiplatform[agent_engines,langchain]==1.91.0",
+        f"google-cloud-aiplatform[agent_engines,langchain] @ {_AI_PLATFORM_GIT}",
         "cloudpickle==3.0",
         "langchain_google_vertexai==2.0.19",
         "langchain_google_firestore==0.5.0",
@@ -126,6 +127,8 @@ def main(argv: list[str]):
         list_agents()
     elif FLAGS.create:
         create()
+    elif FLAGS.create_langchain_agent:
+        create_langchain_agent()
     elif FLAGS.delete:
         if not resource_id:
             raise ValueError("resource_id is required for deletion.")

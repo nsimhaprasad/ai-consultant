@@ -11,7 +11,7 @@ def get_session_history(session_id: str):
     from google.cloud import firestore
 
 
-    client = firestore.Client(project=os.getenv("GOOGLE_CLOUD_PROJECT"))
+    client = firestore.Client(project=os.environ.get("GOOGLE_CLOUD_PROJECT"))
     return FirestoreChatMessageHistory(
         client=client,
         session_id=session_id,
@@ -94,8 +94,8 @@ def generate_tests(code_snippet: str, test_framework: Optional[str] = None) -> s
     Follow TDD principles and provide explanations for test coverage considerations.
     """
 
-if not os.getenv("PROJECT_ID"):
-    raise ValueError("PROJECT_ID environment variable is required for LangchainAgent")
+if not os.getenv("GOOGLE_CLOUD_PROJECT"):
+    raise ValueError("GOOGLE_CLOUD_PROJECT environment variable is required for LangchainAgent")
 
 langchain_agent = agent_engines.LangchainAgent(
     model=model,
