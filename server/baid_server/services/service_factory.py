@@ -17,20 +17,24 @@ logger = logging.getLogger(__name__)
 T = TypeVar('T')
 
 class ServiceFactory(Generic[T]):
-    _agent_service: Optional[LangchainAgentService] = None
+    _agent_service: Optional[AgentService] = None
     _ci_error_service: Optional[CIErrorService] = None
 
     @classmethod
-    async def initialize_agent_service(cls) -> LangchainAgentService:
+    async def initialize_agent_service(cls) -> AgentService:
         if cls._agent_service is None:
             logger.info("Initializing agent service")
             db_pool = await get_db_pool()
             
-            cls._agent_service = LangchainAgentService(
+            cls._agent_service = AgentService(
                 config=AgentConfig(
                     agent_engine_id=os.getenv("AGENT_ENGINE_ID", ""),
                     project_id=os.getenv("PROJECT_ID", ""),
                     location=os.getenv("LOCATION", ""),
+                ),
+                session_service=VertexAiSessionService (
+                    project=os.getenv("PROJECT_ID", ""),
+                    location=os.getenv("LOCATION", "")
                 ),
                 message_repository=MessageRepository(db_pool=db_pool),
                 session_repository=SessionRepository(db_pool=db_pool),

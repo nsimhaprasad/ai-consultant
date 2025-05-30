@@ -57,7 +57,7 @@ class LangchainAgentService:
         logger.debug("Getting ReasoningEngine instance")
         try:
             agent = agent_engines.LangchainAgent(
-                self.config.reasoning_engine_app_name,
+                self.config.agent_engine_id,
             )
             logger.debug("Successfully obtained ReasoningEngine instance")
             return agent

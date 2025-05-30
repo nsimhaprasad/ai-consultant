@@ -61,8 +61,8 @@ def create() -> None:
         adk_app,
         display_name=root_agent.name,
         requirements=[
-            "google-adk (==1.1.1)",
-            f"google-cloud-aiplatform[agent_engines] @ {_AI_PLATFORM_GIT}",
+            "google-adk",
+            "google-cloud-aiplatform[agent_engines,adk]",
             "google-genai (>=1.5.0,<2.0.0)",
             "pydantic (>=2.10.6,<3.0.0)",
             "absl-py (>=2.2.1,<3.0.0)"
@@ -75,10 +75,9 @@ def create() -> None:
     with open("agent_resource.txt", "w") as f:
         f.write(resource_name)
 
-
 def create_langchain_agent() -> None:
     requirements = [
-        f"google-cloud-aiplatform[agent_engines,langchain] @ {_AI_PLATFORM_GIT}",
+        "google-cloud-aiplatform[agent_engines,langchain]==1.91.0",
         "cloudpickle==3.0",
         "langchain_google_vertexai==2.0.19",
         "langchain_google_firestore==0.5.0",
