@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "tech.beskar.baid"
-version = "1.1.5"
+version = "1.1.6"
 
 repositories {
     mavenCentral()
@@ -43,7 +43,7 @@ intellijPlatform {
     projectName = "Baid"
 
     pluginConfiguration {
-        version = "1.1.5"
+        version = "1.1.6"
 
         // Plugin compatibility - updated for 2025.1+ with no upper limit
         ideaVersion {
