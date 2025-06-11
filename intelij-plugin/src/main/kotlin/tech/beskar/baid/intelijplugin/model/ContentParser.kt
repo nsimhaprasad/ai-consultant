@@ -1,9 +1,31 @@
 package tech.beskar.baid.intelijplugin.model
 
 import org.json.JSONObject
+import java.util.Base64
 
-
+/**
+ * Utility class for parsing content from JSON responses.
+ */
 object ContentParser {
+    fun decodeBase64ToBytes(base64String: String): ByteArray {
+        return Base64.getDecoder().decode(base64String)
+    }
+
+    fun decodeBase64ToString(base64String: String): String {
+        val decodedBytes = decodeBase64ToBytes(base64String)
+        return String(decodedBytes, Charsets.UTF_8)
+    }
+
+    fun decodeSafeJsonContent(encodedContent: String): String {
+        return try {
+            // Decode from base64 to bytes, then convert bytes to UTF-8 string
+            String(Base64.getDecoder().decode(encodedContent), Charsets.UTF_8)
+        } catch (e: Exception) {
+            // If base64 decoding fails, assume it's using the fallback method (escaped newlines)
+            encodedContent.replace("\\n", "\n").replace("\\r", "\r")
+        }
+    }
+
     fun parseResponse(json: String): ContentResponse {
         val root = JSONObject(json)
         val blocksJson = root.getJSONArray("blocks")
@@ -57,7 +79,7 @@ object ContentParser {
         }
         "code" -> {
             val language = blockObj.getString("language")
-            val content = blockObj.getString("content")
+            val content = decodeSafeJsonContent(blockObj.getString("content"))
             val executable = blockObj.optBoolean("executable", false)
             Block.Code(language, content, executable)
         }

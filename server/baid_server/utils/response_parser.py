@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 from typing import Optional, Dict, Any, List, AsyncGenerator
@@ -11,10 +12,20 @@ logger = logging.getLogger(__name__)
 
 class ResponseParser:
     @staticmethod
-    async def process_incoming_chunk(event) -> AsyncGenerator[str, Any]:
+    async def process_incoming_chunk(data) -> AsyncGenerator[str, Any]:
         try:
-            # Extract blocks from the cleaned JSON
-            blocks = ResponseParser.extract_blocks(JetbrainsResponse(**event))
+            # Handle both string (JSON) and dictionary inputs
+            if isinstance(data, str):
+                # Parse JSON string first
+                parsed_data = json.loads(data)
+            elif isinstance(data, dict):
+                # Use dictionary directly
+                parsed_data = data
+            else:
+                return
+
+            # Extract blocks from the parsed data
+            blocks = ResponseParser.extract_blocks(JetbrainsResponse(**parsed_data))
             if blocks:
                 for block in blocks:
                     # Format each block
@@ -22,16 +33,39 @@ class ResponseParser:
                     if formatted_block:
                         # Stream each block individually
                         yield formatted_block
+        except json.JSONDecodeError as e:
+            logger.debug(f"JSON decode error: {str(e)}")
         except Exception as e:
             logger.debug(f"Error processing chunk: {str(e)}")
 
     @staticmethod
-    def extract_blocks(response: JetbrainsResponse) -> List[Dict[str, Any]]:
-        json_buffer = str(json.dumps(response.dict()))
+    def smart_json_fix_for_code(content: str) -> str:
         try:
-            return [block.dict() for block in response.response.content.blocks]
+            encoded = base64.b64encode(content.encode('utf-8')).decode('ascii')
+            return encoded
+        except Exception as e:
+            return content.replace('\n', '\\n').replace('\r', '\\r')
+
+    @staticmethod
+    def extract_blocks(response: JetbrainsResponse) -> List[Dict[str, Any]]:
+
+        try:
+            blocks = []
+            for block in response.response.content.blocks:
+                block_dict = block.dict()
+
+                # If it's a code block, fix the content
+                if block_dict.get('type') == 'code' and 'content' in block_dict:
+                    if block_dict['content']:  # Only if content exists
+                        block_dict['content'] = ResponseParser.smart_json_fix_for_code(block_dict['content'])
+
+                blocks.append(block_dict)
+
+            return blocks
         except (json.JSONDecodeError, ValidationError, Exception) as e:
             # If complete parsing fails, try to extract blocks using regex
+            json_buffer = str(json.dumps(response.dict()))
+
             logger.debug(f"JSON parsing error: {e}")
             import re
             blocks = []
