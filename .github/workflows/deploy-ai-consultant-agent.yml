@@ -65,25 +65,17 @@ jobs:
           GCP_BUCKET: ${{ vars.GCP_BUCKET }}
         run: |
           cd agents/ai-consultant-agent/deployment
-          # Run the deploy script and capture the output to a log file
           python deploy.py --create --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET > deploy_output.log 2>&1
           
-          # Extract the agent resource ID from the last line of output that contains "Created remote agent:"
           AGENT_RESOURCE=$(grep "Created remote agent:" deploy_output.log | tail -1 | awk -F': ' '{print $2}')
-          
-          # Check if we got a valid resource ID
           if [[ -z "$AGENT_RESOURCE" ]]; then
-            echo "Failed to extract agent resource ID from deploy output"
-            cat deploy_output.log
-            exit 1
+              echo "Debugging deploy_output.log content:"
+              cat deploy_output.log
+              echo "Failed to extract agent resource ID."
+              exit 1
           fi
-          
-          # Save the resource ID to the agent_resource.txt file
           echo "$AGENT_RESOURCE" > agent_resource.txt
-          
-          # Print it for logging purposes
           echo "Extracted agent resource ID: $AGENT_RESOURCE"
-          echo "Saved to agent_resource.txt"
 
       # Upload the artifact with a consistent name for cross-workflow use
       - name: Upload agent resource file for server
