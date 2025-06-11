@@ -61,13 +61,15 @@ jobs:
       - name: Deploy AI Consultant Agent to Vertex AI and capture resource ID
         env:
           PROJECT_ID: ${{ vars.PROJECT_ID }}
-          REGION: us-central1  # Override region just for agent deployment
+          REGION: us-central1
           GCP_BUCKET: ${{ vars.GCP_BUCKET }}
         run: |
           cd agents/ai-consultant-agent/deployment
           python deploy.py --create --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET > deploy_output.log 2>&1
           
-          AGENT_RESOURCE=$(grep "Created remote agent:" deploy_output.log | tail -1 | awk -F': ' '{print $2}')
+          # Use sed for pattern extraction
+          AGENT_RESOURCE=$(grep "Created remote agent:" deploy_output.log | tail -1 | sed 's/.*Created remote agent: *//')
+          
           if [[ -z "$AGENT_RESOURCE" ]]; then
               echo "Debugging deploy_output.log content:"
               cat deploy_output.log
