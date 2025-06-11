@@ -152,13 +152,13 @@ jobs:
         env:
           INTELLIJ_PUBLISH_TOKEN: ${{ secrets.INTELLIJ_PUBLISH_TOKEN }}
           BAID_CLIENT_ID: ${{ secrets.BAID_CLIENT_ID }}
-          BAID_REDIRECT_URI: ${{ secrets.BAID_REDIRECT_URI }}
-          BAID_AUTH_ENDPOINT: ${{ secrets.BAID_AUTH_ENDPOINT }}
-          BAID_SCOPE: ${{ secrets.BAID_SCOPE }}
-          BAID_ACCESS_TYPE: ${{ secrets.BAID_ACCESS_TYPE }}
-          BAID_PROMPT: ${{ secrets.BAID_PROMPT }}
-          BAID_BACKEND_URL: ${{ secrets.BAID_BACKEND_URL }}
-          BAID_API_ENDPOINT: ${{ secrets.BAID_API_ENDPOINT }}
+          BAID_REDIRECT_URI: ${{ vars.BAID_REDIRECT_URI }}
+          BAID_AUTH_ENDPOINT: ${{ vars.BAID_AUTH_ENDPOINT }}
+          BAID_SCOPE: ${{ vars.BAID_SCOPE }}
+          BAID_ACCESS_TYPE: ${{ vars.BAID_ACCESS_TYPE }}
+          BAID_PROMPT: ${{ vars.BAID_PROMPT }}
+          BAID_BACKEND_URL: ${{ vars.BAID_BACKEND_URL }}
+          BAID_API_ENDPOINT: ${{ vars.BAID_API_ENDPOINT }}
           BAID_BACKEND_TOKEN_KEY: ${{ secrets.BAID_BACKEND_TOKEN_KEY }}
           BAID_TOKEN_EXPIRY_KEY: ${{ secrets.BAID_TOKEN_EXPIRY_KEY }}
 
