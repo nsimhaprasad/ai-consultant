@@ -67,8 +67,8 @@ jobs:
           cd agents/ai-consultant-agent/deployment
           python deploy.py --create --project_id $PROJECT_ID --location us-central1 --bucket $GCP_BUCKET > deploy_output.log 2>&1
           
-          # Use sed for pattern extraction
-          AGENT_RESOURCE=$(grep "Created remote agent:" deploy_output.log | tail -1 | sed 's/.*Created remote agent: *//')
+          # Use cut to split on colon and take everything after first colon, then trim spaces
+          AGENT_RESOURCE=$(grep "Created remote agent:" deploy_output.log | tail -1 | cut -d':' -f2- | xargs)
           
           if [[ -z "$AGENT_RESOURCE" ]]; then
               echo "Debugging deploy_output.log content:"
