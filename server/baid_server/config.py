@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     DB_USER: Optional[str] = None
     PROJECT_ID: Optional[str] = None
     JWT_SECRET: Optional[str] = None
+    GCS_SYNC_BUCKET: str = "baid-sync-storage"
 
     # Secrets
     AGENT_ENGINE_ID: Optional[SecretStr] = None

@@ -19,10 +19,8 @@ logger = get_logger()
 from baid_server.config import settings
 settings.print_variables()
 
-from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error, tenant
+from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error, users, tenant, sync
 from baid_server.api.middleware import TokenLimitMiddleware
-
-from baid_server.api.routes import auth, agent, sessions, waitlist, api_key, auth_api_key, ci_error, users, tenant
 from baid_server.db.database import get_db_pool, close_db_pool
 from baid_server.services.service_factory import ServiceFactory
 from baid_server.utils.git_utils import get_git_commit_sha
@@ -141,6 +139,7 @@ app.include_router(auth_api_key)
 app.include_router(ci_error)
 app.include_router(tenant)
 app.include_router(users)
+app.include_router(sync)
 
 # Mount static files directory
 static_dir = os.path.join(os.path.dirname(__file__), "static")

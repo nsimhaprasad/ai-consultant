@@ -12,6 +12,7 @@ from baid_server.api.routes.auth_api_key import router as auth_api_key
 from baid_server.api.routes.ci_error import router as ci_error
 from baid_server.api.routes.tenant import router as tenant
 from baid_server.api.routes.users import router as users
+from baid_server.api.routes.sync import router as sync
 
 # Export all routers
-__all__ = ['auth', 'agent', 'sessions', 'waitlist', 'api_key', 'auth_api_key', 'ci_error', 'tenant', 'users']
+__all__ = ['auth', 'agent', 'sessions', 'waitlist', 'api_key', 'auth_api_key', 'ci_error', 'tenant', 'users', 'sync']

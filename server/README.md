@@ -42,7 +42,12 @@ docker run -p 8080:8080 baid-server
 
 - `baid_server/` - Main package directory
   - `main.py` - FastAPI application entry point
+  - `api/routes/` - API route handlers
+    - `sync.py` - Sync API for baid-sync tool
   - `services/` - Service modules
+    - `sync_service.py` - Google Cloud Storage sync service
+  - `models/` - Pydantic models
+    - `sync.py` - Sync request/response models
 
 ## CI/CD and Artifact Integration
 
@@ -72,6 +77,37 @@ This is the backend server for the IntelliJ plugin. It uses FastAPI for handling
    uvicorn main:app --reload
    ```
 
-## Endpoints
-- `GET /` - Health check
-- `POST /consult` - Placeholder for plugin API calls
+## API Endpoints
+
+### Core Endpoints
+- `GET /` - Server health check and status
+- `GET /health` - Detailed health check for Cloud Run
+- `POST /api/consult` - AI consultation endpoint for IntelliJ plugin
+
+### Authentication
+- `GET /api/auth/google-login` - Google OAuth callback
+- `GET /api/auth/session` - Session polling for OAuth
+- `POST /api/auth/api-key` - API key authentication
+
+### Sync API (for baid-sync tool)
+- `POST /api/sync/signed-url` - Get signed URL for compressed archive upload to GCS
+- `GET /api/sync/status` - Sync service status and configuration
+
+### Other APIs
+- Session management (`/api/sessions/*`)
+- User management (`/api/users/*`)
+- Waitlist (`/api/waitlist`)
+- CI error analysis (`/api/ci-error/*`)
+
+## Environment Variables
+
+### Required
+- `JWT_SECRET` - Secret for JWT token signing
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+- `DATABASE_URL` - PostgreSQL connection string
+
+### Optional
+- `GCS_SYNC_BUCKET` - Google Cloud Storage bucket for sync (default: "baid-sync-storage")
+- `GOOGLE_APPLICATION_CREDENTIALS` - Path to GCS service account key
+- `AGENT_ENGINE_ID` - Vertex AI agent engine ID
